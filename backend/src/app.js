@@ -1,27 +1,25 @@
+// backend/src/app.js
+
 const express = require('express');
 const cors = require('cors');
-const helmet = require('helmet');
-const dotenv = require('dotenv');
 
-// Cargar variables de entorno
-dotenv.config();
-
-// Crear aplicación Express
 const app = express();
 
 // Middleware
-app.use(helmet());
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// ===========================================
+// Rutas de Auth
+// ===========================================
 const authRoutes = require('./routes/auth');
 app.use('/api/auth', authRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-  res.status(200).json({ 
-    status: 'OK', 
+  res.status(200).json({
+    status: 'OK',
     timestamp: new Date().toISOString(),
     service: 'quester-backend'
   });
@@ -44,5 +42,4 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Exportar app
 module.exports = app;
