@@ -1,22 +1,18 @@
+// backend/src/routes/auth/index.js
+
 const express = require('express');
 const router = express.Router();
+const authController = require('../../controllers/authController');
 
-// Importar rutas (se agregarán después)
-// const authRoutes = require('./auth');
-// const tripRoutes = require('./trips');
-
-// Rutas base
+// Health check para auth routes
 router.get('/', (req, res) => {
-  res.json({ 
-    message: 'Quester API',
-    version: '1.0.0',
-    endpoints: {
-      health: '/health',
-      auth: '/api/auth',
-      trips: '/api/trips'
-    }
-  });
+  res.json({ message: 'Auth routes working', timestamp: new Date().toISOString() });
 });
 
-// Exportar rutas
+// Registro
+router.post('/register', authController.register);
+
+// Login
+router.post('/login', authController.login);
+
 module.exports = router;
