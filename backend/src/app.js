@@ -11,12 +11,18 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // ===========================================
-// Rutas de Auth
+// Rutas Públicas (No requieren autenticación)
 // ===========================================
 const authRoutes = require('./routes/auth');
 app.use('/api/auth', authRoutes);
 
-// Health check endpoint
+// ===========================================
+// Rutas Protegidas (Requieren autenticación)
+// ===========================================
+const profileRoutes = require('./routes/profile');
+app.use('/api/profile', profileRoutes);
+
+// Health check endpoint (público)
 app.get('/health', (req, res) => {
   res.status(200).json({
     status: 'OK',
