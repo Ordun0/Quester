@@ -10,28 +10,35 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Debug logs
+console.log('📍 Loading routes...');
+
 // ===========================================
-// Rutas Públicas (No requieren autenticación)
+// ✅ CORRECCIÓN: Ruta correcta a auth/auth.js
 // ===========================================
-const authRoutes = require('./routes/auth');
+const authRoutes = require('./routes/auth/auth');  // ← Cambiar de './routes/auth'
+console.log('📍 Auth routes loaded from:', './routes/auth/auth');
+console.log('📍 authRoutes type:', typeof authRoutes);
+
 app.use('/api/auth', authRoutes);
+console.log('✅ Auth routes mounted at /api/auth');
 
-// ===========================================
-// Rutas Protegidas (Requieren autenticación)
-// ===========================================
+// Rutas de Perfil (esta sí está bien)
 const profileRoutes = require('./routes/profile');
+console.log('📍 Profile routes loaded');
 app.use('/api/profile', profileRoutes);
+console.log('✅ Profile routes mounted at /api/profile');
 
-// Health check endpoint (público)
+// Health check
 app.get('/health', (req, res) => {
   res.status(200).json({
     status: 'OK',
-    timestamp: new Date().toISOString(),
+    timestamp: Date.now(),
     service: 'quester-backend'
   });
 });
 
-// Manejo de rutas no encontradas
+// 404 handler (AL FINAL)
 app.use((req, res) => {
   res.status(404).json({
     error: 'Not Found',
@@ -39,7 +46,7 @@ app.use((req, res) => {
   });
 });
 
-// Manejo de errores global
+// Error handler
 app.use((err, req, res, next) => {
   console.error('Error:', err);
   res.status(500).json({

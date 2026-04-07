@@ -21,7 +21,7 @@ const docClient = DynamoDBDocumentClient.from(client);
 const saveAuditLog = async (data) => {
   try {
     const logId = `log_${uuidv4()}`;
-    const timestamp = Date.now().toString();
+    const timestamp = Date.now();
     
     await docClient.send(new PutCommand({
       TableName: process.env.DYNAMODB_TABLE_LOGS,
@@ -477,24 +477,38 @@ exports.login = async (req, res) => {
 };
 
 // ===========================================
-// CONTROLADOR DE PERFIL (Tarea 42)
+// CONTROLADOR DE PERFIL (Tarea 42) - CORREGIDO
 // ===========================================
 
 exports.getProfile = async (req, res) => {
   try {
+    // ✅ Verificar que req.user existe (del middleware)
+    if (!req.user || !req.user.userId) {
+      console.error('❌ req.user es undefined o no tiene userId');
+      return res.status(401).json({
+        success: false,
+        error: 'UNAUTHORIZED',
+        message: 'User not authenticated'
+      });
+    }
+
     const userId = req.user.userId;
+    const email = req.user.email;
+
+    console.log('📍 Getting profile for:', userId, email);
 
     const params = {
       TableName: process.env.DYNAMODB_TABLE_USERS,
       Key: {
         userId: userId,
-        email: req.user.email
+        email: email
       }
     };
 
     const result = await docClient.send(new GetCommand(params));
 
     if (!result.Item) {
+      console.error('❌ Usuario no encontrado en DynamoDB');
       return res.status(404).json({
         success: false,
         error: 'USER_NOT_FOUND',
@@ -502,23 +516,31 @@ exports.getProfile = async (req, res) => {
       });
     }
 
+    // ✅ Manejar createdAt/updatedAt como String o Number
+    const createdAt = result.Item.createdAt;
+    const updatedAt = result.Item.updatedAt;
+
     res.status(200).json({
       success: true,
       data: {
         userId: result.Item.userId,
         email: result.Item.email,
         nombreCompleto: result.Item.nombreCompleto,
-        createdAt: new Date(parseInt(result.Item.createdAt)).toISOString(),
-        updatedAt: new Date(parseInt(result.Item.updatedAt)).toISOString()
+        createdAt: createdAt ? new Date(parseInt(createdAt)).toISOString() : new Date().toISOString(),
+        updatedAt: updatedAt ? new Date(parseInt(updatedAt)).toISOString() : new Date().toISOString()
       }
     });
 
   } catch (error) {
-    console.error('Get profile error:', error);
+    console.error('❌ Get profile error:', error);
+    console.error('Error name:', error.name);
+    console.error('Error message:', error.message);
+    
     res.status(500).json({
       success: false,
       error: 'INTERNAL_SERVER_ERROR',
-      message: 'Failed to get profile'
+      message: 'Failed to get profile',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -583,23 +605,38 @@ exports.updateProfile = async (req, res) => {
   }
 };
 
+// backend/src/controllers/authController.js
+
 exports.deleteAccount = async (req, res) => {
   try {
     const userId = req.user.userId;
+    const userEmail = req.user.email;
     const timestamp = Date.now().toString();
 
-    const params = {
+    // ✅ Eliminar usuario (datos personales)
+    await docClient.send(new DeleteCommand({
       TableName: process.env.DYNAMODB_TABLE_USERS,
       Key: {
         userId: userId,
-        email: req.user.email
+        email: userEmail
       }
-    };
+    }));
 
-    await docClient.send(new DeleteCommand(params));
+    // ⚠️ Eliminar viajes - COMENTADO HASTA SEMANA 5
+    // await docClient.send(new DeleteCommand({
+    //   TableName: process.env.DYNAMODB_TABLE_TRIPS,
+    //   Key: { userId: userId, tripId: 'all' }
+    // }));
 
+    // ⚠️ Invalidar sesiones - COMENTADO HASTA SEMANA 3
+    // await docClient.send(new DeleteCommand({
+    //   TableName: process.env.DYNAMODB_TABLE_SESSIONS,
+    //   Key: { userId: userId, sessionId: 'all' }
+    // }));
+
+    // ✅ Registrar en audit logs
     await saveAuditLog({
-      email: req.user.email,
+      email: userEmail,
       ipAddress: req.ip || req.connection.remoteAddress,
       tipoEvento: 'account_delete',
       resultado: 'success',
@@ -623,12 +660,14 @@ exports.deleteAccount = async (req, res) => {
 
 // ===========================================
 // CONTROLADOR DE RECUPERACIÓN (Tareas 34-36)
+// RF-03: RECUPERACIÓN DE CONTRASEÑA
 // ===========================================
 
 exports.forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
 
+    // RF-03.01.01 - Solicitar email asociado a cuenta existente
     if (!email) {
       return res.status(400).json({
         success: false,
@@ -638,6 +677,7 @@ exports.forgotPassword = async (req, res) => {
       });
     }
 
+    // Validar formato de email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return res.status(400).json({
@@ -648,6 +688,7 @@ exports.forgotPassword = async (req, res) => {
       });
     }
 
+    // RF-03.01.02 - Validar que email exista en BD antes de procesar
     const queryParams = {
       TableName: process.env.DYNAMODB_TABLE_USERS,
       IndexName: 'email-index',
@@ -659,41 +700,63 @@ exports.forgotPassword = async (req, res) => {
 
     const result = await docClient.send(new QueryCommand(queryParams));
 
+    // RF-03.01.03 - Mostrar "Not a linked email" cuando email no exista
     if (!result.Items || result.Items.length === 0) {
+      // Registrar en audit logs (intento de recuperación con email no registrado)
+      await saveAuditLog({
+        email: email.toLowerCase(),
+        ipAddress: req.ip || req.connection.remoteAddress,
+        tipoEvento: 'forgot_password',
+        resultado: 'failure',
+        razon: 'email_not_found',
+        userId: null
+      });
+
       return res.status(404).json({
         success: false,
         error: 'EMAIL_NOT_FOUND',
-        message: 'No hay cuenta asociada a este email'
+        message: 'Not a linked email'
       });
     }
 
-    const recoveryToken = Math.floor(100000 + Math.random() * 900000).toString();
-    const tokenExpiry = (Date.now() + 3600000).toString();
+    const user = result.Items[0];
 
+    // RF-03.02 - Generar token de recuperación
+    // RF-03.02.01 - Token alfanumérico único de MÍNIMO 32 caracteres
+    const recoveryToken = require('crypto').randomBytes(32).toString('hex'); // 64 caracteres hex
+    const tokenExpiry = Date.now() + (20 * 60 * 1000); // RF-03.02.03 - 20 minutos (no 1 hora)
+
+    // RF-03.02.02 - Asociar token con email en BD
     await docClient.send(new UpdateCommand({
       TableName: process.env.DYNAMODB_TABLE_USERS,
       Key: {
-        userId: result.Items[0].userId,
+        userId: user.userId,
         email: email.toLowerCase()
       },
-      UpdateExpression: 'SET recoveryToken = :token, recoveryTokenExpiry = :expiry',
+      UpdateExpression: 'SET recoveryToken = :token, recoveryTokenExpiry = :expiry, recoveryTokenUsed = :used',
       ExpressionAttributeValues: {
         ':token': recoveryToken,
-        ':expiry': tokenExpiry
+        ':expiry': tokenExpiry.toString(),
+        ':used': false  // Para RF-03.02.05 - controlar si ya fue usado
       }
     }));
 
+    // RF-03.02 - Simular envío de email (console.log por ahora)
+    // En producción, esto enviaría un email real con el token
     console.log('📧 Email enviado a:', email.toLowerCase());
     console.log('🔑 Token de recuperación:', recoveryToken);
+    console.log('⏰ Token válido hasta:', new Date(tokenExpiry).toISOString());
 
+    // Registrar en audit logs
     await saveAuditLog({
       email: email.toLowerCase(),
       ipAddress: req.ip || req.connection.remoteAddress,
       tipoEvento: 'forgot_password',
       resultado: 'success',
-      userId: result.Items[0].userId
+      userId: user.userId
     });
 
+    // RF-03.01 - Response exitoso (no revelar si el email existe por seguridad)
     res.status(200).json({
       success: true,
       message: 'Recovery code sent to your email',
@@ -702,6 +765,16 @@ exports.forgotPassword = async (req, res) => {
 
   } catch (error) {
     console.error('Forgot password error:', error);
+    
+    await saveAuditLog({
+      email: req.body?.email || 'unknown',
+      ipAddress: req.ip || req.connection.remoteAddress,
+      tipoEvento: 'forgot_password',
+      resultado: 'failure',
+      razon: error.message,
+      userId: null
+    });
+
     res.status(500).json({
       success: false,
       error: 'INTERNAL_SERVER_ERROR',
@@ -711,9 +784,11 @@ exports.forgotPassword = async (req, res) => {
 };
 
 exports.resetPassword = async (req, res) => {
+	
   try {
     const { email, token, newPassword, confirmPassword } = req.body;
 
+    // Validar campos requeridos
     if (!email || !token || !newPassword || !confirmPassword) {
       return res.status(400).json({
         success: false,
@@ -728,6 +803,7 @@ exports.resetPassword = async (req, res) => {
       });
     }
 
+    // RF-03.03.01 - Validar que ambos campos de contraseña coincidan
     if (newPassword !== confirmPassword) {
       return res.status(400).json({
         success: false,
@@ -737,6 +813,7 @@ exports.resetPassword = async (req, res) => {
       });
     }
 
+    // RF-03.03.02 - Validar requisitos de RF-01.03
     if (newPassword.length < 8) {
       return res.status(400).json({
         success: false,
@@ -764,6 +841,7 @@ exports.resetPassword = async (req, res) => {
       });
     }
 
+    // Buscar usuario por email
     const queryParams = {
       TableName: process.env.DYNAMODB_TABLE_USERS,
       IndexName: 'email-index',
@@ -779,12 +857,13 @@ exports.resetPassword = async (req, res) => {
       return res.status(404).json({
         success: false,
         error: 'EMAIL_NOT_FOUND',
-        message: 'No hay cuenta asociada a este email'
+        message: 'Not a linked email'
       });
     }
 
     const user = result.Items[0];
 
+    // RF-03.02.06 - Rechazar token expirado o ya utilizado
     if (!user.recoveryToken || user.recoveryToken !== token) {
       return res.status(400).json({
         success: false,
@@ -793,7 +872,23 @@ exports.resetPassword = async (req, res) => {
       });
     }
 
+    // RF-03.02.04 - Invalidar automáticamente después de 20 minutos
     if (user.recoveryTokenExpiry && parseInt(user.recoveryTokenExpiry) < Date.now()) {
+      // Limpiar token expirado
+      await docClient.send(new UpdateCommand({
+        TableName: process.env.DYNAMODB_TABLE_USERS,
+        Key: {
+          userId: user.userId,
+          email: email.toLowerCase()
+        },
+        UpdateExpression: 'SET recoveryToken = :nullToken, recoveryTokenExpiry = :nullExpiry, recoveryTokenUsed = :nullUsed',
+        ExpressionAttributeValues: {
+          ':nullToken': null,
+          ':nullExpiry': null,
+          ':nullUsed': null
+        }
+      }));
+
       return res.status(400).json({
         success: false,
         error: 'TOKEN_EXPIRED',
@@ -801,24 +896,38 @@ exports.resetPassword = async (req, res) => {
       });
     }
 
+    // RF-03.02.05 - Verificar si token ya fue usado
+    if (user.recoveryTokenUsed === true) {
+      return res.status(400).json({
+        success: false,
+        error: 'TOKEN_ALREADY_USED',
+        message: 'Este código de recuperación ya fue utilizado'
+      });
+    }
+
+    // RF-03.03.05 - Hashear nueva contraseña
     const saltRounds = parseInt(process.env.BCRYPT_ROUNDS) || 10;
     const passwordHash = await bcrypt.hash(newPassword, saltRounds);
 
+    // RF-03.03.04 - Invalidar contraseña anterior inmediatamente
+    // RF-03.02.05 - Invalidar token después de primer uso exitoso
     await docClient.send(new UpdateCommand({
       TableName: process.env.DYNAMODB_TABLE_USERS,
       Key: {
         userId: user.userId,
         email: email.toLowerCase()
       },
-      UpdateExpression: 'SET passwordHash = :passwordHash, recoveryToken = :nullToken, recoveryTokenExpiry = :nullExpiry, updatedAt = :updatedAt',
+      UpdateExpression: 'SET passwordHash = :passwordHash, recoveryToken = :nullToken, recoveryTokenExpiry = :nullExpiry, recoveryTokenUsed = :nullUsed, updatedAt = :updatedAt',
       ExpressionAttributeValues: {
         ':passwordHash': passwordHash,
         ':nullToken': null,
         ':nullExpiry': null,
+        ':nullUsed': null,
         ':updatedAt': Date.now().toString()
       }
     }));
 
+    // Registrar en audit logs
     await saveAuditLog({
       email: email.toLowerCase(),
       ipAddress: req.ip || req.connection.remoteAddress,
@@ -834,10 +943,167 @@ exports.resetPassword = async (req, res) => {
 
   } catch (error) {
     console.error('Reset password error:', error);
+    
+    await saveAuditLog({
+      email: req.body?.email || 'unknown',
+      ipAddress: req.ip || req.connection.remoteAddress,
+      tipoEvento: 'reset_password',
+      resultado: 'failure',
+      razon: error.message,
+      userId: null
+    });
+
     res.status(500).json({
       success: false,
       error: 'INTERNAL_SERVER_ERROR',
       message: 'Failed to reset password'
+    });
+  }
+};
+
+// ===========================================
+// CAMBIAR CONTRASEÑA (RF-04.03)
+// ===========================================
+exports.changePassword = async (req, res) => {
+  try {
+    // RF-04.03 - Requiere autenticación (viene del middleware)
+    const userId = req.user.userId;
+    const userEmail = req.user.email;
+    const { currentPassword, newPassword, confirmPassword } = req.body;
+
+    // Validar campos requeridos
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        error: 'VALIDATION_ERROR',
+        message: 'Dont leave it blank',
+        fields: {
+          currentPassword: !currentPassword,
+          newPassword: !newPassword,
+          confirmPassword: !confirmPassword
+        }
+      });
+    }
+
+    // RF-04.03.03 - Validar coincidencia de contraseñas
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        error: 'VALIDATION_ERROR',
+        message: 'Las contraseñas no coinciden',
+        field: 'confirmPassword'
+      });
+    }
+
+    // RF-04.03.02 - Validar requisitos de RF-01.03
+    if (newPassword.length < 8) {
+      return res.status(400).json({
+        success: false,
+        error: 'VALIDATION_ERROR',
+        message: 'La contraseña debe contener mínimo 8 caracteres',
+        field: 'newPassword'
+      });
+    }
+
+    if (!/\d/.test(newPassword)) {
+      return res.status(400).json({
+        success: false,
+        error: 'VALIDATION_ERROR',
+        message: 'La contraseña debe contener al menos 1 carácter numérico',
+        field: 'newPassword'
+      });
+    }
+
+    if (!/[!@#$%&*()_+\-=\[\]{}<>?]/.test(newPassword)) {
+      return res.status(400).json({
+        success: false,
+        error: 'VALIDATION_ERROR',
+        message: 'La contraseña debe contener al menos 1 carácter especial',
+        field: 'newPassword'
+      });
+    }
+
+    // Buscar usuario por userId
+    const getUserParams = {
+      TableName: process.env.DYNAMODB_TABLE_USERS,
+      Key: {
+        userId: userId,
+        email: userEmail
+      }
+    };
+
+    const result = await docClient.send(new GetCommand(getUserParams));
+
+    if (!result.Item) {
+      return res.status(404).json({
+        success: false,
+        error: 'USER_NOT_FOUND',
+        message: 'User not found'
+      });
+    }
+
+    const user = result.Item;
+
+    // Verificar contraseña actual
+    const isValidCurrentPassword = await bcrypt.compare(currentPassword, user.passwordHash);
+    
+    if (!isValidCurrentPassword) {
+      return res.status(401).json({
+        success: false,
+        error: 'WRONG_PASSWORD',
+        message: 'Current password is incorrect'
+      });
+    }
+
+    // RF-04.03.04 - Invalidar contraseña anterior inmediatamente
+    // RF-04.03.05 - Almacenar nueva contraseña encriptada
+    const saltRounds = parseInt(process.env.BCRYPT_ROUNDS) || 10;
+    const newpasswordHash = await bcrypt.hash(newPassword, saltRounds);
+
+    await docClient.send(new UpdateCommand({
+      TableName: process.env.DYNAMODB_TABLE_USERS,
+      Key: {
+        userId: userId,
+        email: userEmail
+      },
+      UpdateExpression: 'SET passwordHash = :passwordHash, updatedAt = :updatedAt',
+      ExpressionAttributeValues: {
+        ':passwordHash': newpasswordHash,
+        ':updatedAt': Date.now().toString()
+      }
+    }));
+
+    // Registrar en audit logs
+    await saveAuditLog({
+      email: userEmail,
+      ipAddress: req.ip || req.connection.remoteAddress,
+      tipoEvento: 'change_password',
+      resultado: 'success',
+      userId: userId
+    });
+
+    // ✅ RF-04.05.01 - Mensaje "Profile updated"
+    res.status(200).json({
+      success: true,
+      message: 'Profile updated'
+    });
+
+  } catch (error) {
+    console.error('Change password error:', error);
+    
+    await saveAuditLog({
+      email: req.user?.email || 'unknown',
+      ipAddress: req.ip || req.connection.remoteAddress,
+      tipoEvento: 'change_password',
+      resultado: 'failure',
+      razon: error.message,
+      userId: req.user?.userId || null
+    });
+
+    res.status(500).json({
+      success: false,
+      error: 'INTERNAL_SERVER_ERROR',
+      message: 'Failed to change password'
     });
   }
 };

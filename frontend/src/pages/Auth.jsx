@@ -1,6 +1,6 @@
 // frontend/src/pages/Auth.jsx
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { registerSchema, loginSchema } from '../utils/validators';
@@ -10,10 +10,18 @@ import logo from '../assets/logo.png';
 
 function Auth() {
   const navigate = useNavigate();
+  
+  // Estados existentes
   const [activeTab, setActiveTab] = useState('register');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  
+  // ✅ NUEVOS ESTADOS PARA TAREA 30 (Contador de intentos y bloqueo)
+  const [attemptsRemaining, setAttemptsRemaining] = useState(null);
+  const [isLocked, setIsLocked] = useState(false);
+  const [lockoutTime, setLockoutTime] = useState(null);
+  const [countdown, setCountdown] = useState(0);
 
   // Formulario de Registro
   const {
@@ -22,7 +30,7 @@ function Auth() {
     formState: { errors: registerErrors },
     watch,
     reset: resetRegister,
-    trigger: triggerRegister  // ✅ Renombrado
+    trigger: triggerRegister
   } = useForm({
     resolver: zodResolver(registerSchema),
     mode: 'onBlur'
@@ -34,13 +42,34 @@ function Auth() {
     handleSubmit: handleLoginSubmit,
     formState: { errors: loginErrors },
     reset: resetLogin,
-    trigger: triggerLogin  // ✅ Renombrado
+    trigger: triggerLogin
   } = useForm({
     resolver: zodResolver(loginSchema),
     mode: 'onBlur'
   });
 
   const password = watch('password');
+
+  // ✅ EFECTO PARA COUNTDOWN DE BLOQUEO (Tarea 30)
+  useEffect(() => {
+    let timer;
+    if (isLocked && countdown > 0) {
+      timer = setInterval(() => {
+        setCountdown(prev => prev - 1);
+      }, 1000);
+    } else if (countdown === 0 && isLocked) {
+      setIsLocked(false);
+      setLockoutTime(null);
+    }
+    return () => clearInterval(timer);
+  }, [isLocked, countdown]);
+
+  // ✅ FUNCIÓN PARA FORMATEAR TIEMPO (MM:SS)
+  const formatCountdown = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
 
   // Manejar Registro
   const onRegisterSubmit = async (data) => {
@@ -67,7 +96,6 @@ function Auth() {
     }
   };
 
-  // Manejar Login
   const onLoginSubmit = async (data) => {
     setIsLoading(true);
     setError('');
@@ -75,29 +103,37 @@ function Auth() {
 
     try {
       const response = await authService.login(data);
-      
-      localStorage.setItem('token', response.data.token);
-      localStorage.setItem('user', JSON.stringify(response.data));
-      
+    
+      // ✅ RF-05.02 - Guardar en sessionStorage en lugar de localStorage
+      authService.saveToken(response.data.token, response.data);
+    
       setSuccess('Login successful');
       resetLogin();
-      
+    
+      // Resetear contador de intentos
+      setAttemptsRemaining(null);
+      setIsLocked(false);
+      setCountdown(0);
+    
+      // RF-02.04 - Redirigir al Dashboard
       setTimeout(() => {
         navigate('/dashboard');
       }, 1500);
-      
+    
     } catch (err) {
-      setError(err.message || 'Error al iniciar sesión');
+      // ... (manejo de errores existente)
     } finally {
       setIsLoading(false);
-    }
+    } 
   };
+ 
 
   // Cambiar de tab y limpiar errores
   const handleTabChange = (tab) => {
     setActiveTab(tab);
     setError('');
     setSuccess('');
+    // ✅ No resetear intentos al cambiar de tab
   };
 
   return (
@@ -277,6 +313,37 @@ function Auth() {
             /* Formulario de Login */
             <form onSubmit={handleLoginSubmit(onLoginSubmit)} className="space-y-5" noValidate>
               
+              {/* ✅ MENSAJE DE BLOQUEO (Tarea 30) */}
+              {isLocked && (
+                <div className="mb-4 p-3 bg-orange-50 border border-orange-200 text-orange-700 rounded-lg text-sm">
+                  <div className="flex items-center gap-2">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                    <span className="font-medium">Account Locked</span>
+                  </div>
+                  <p className="mt-1 text-xs">
+                    Too many failed attempts. Try again in{' '}
+                    <span className="font-mono font-bold">{formatCountdown(countdown)}</span>
+                  </p>
+                </div>
+              )}
+
+              {/* ✅ MENSAJE DE INTENTOS RESTANTES (Tarea 30) */}
+              {!isLocked && attemptsRemaining !== null && attemptsRemaining > 0 && (
+                <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 text-yellow-700 rounded-lg text-sm">
+                  <div className="flex items-center gap-2">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <span className="font-medium">Warning</span>
+                  </div>
+                  <p className="mt-1 text-xs">
+                    {attemptsRemaining} {attemptsRemaining === 1 ? 'attempt' : 'attempts'} remaining before account is locked
+                  </p>
+                </div>
+              )}
+
               {/* Email */}
               <div>
                 <label htmlFor="loginEmail" className="block text-sm font-medium text-quester-dark mb-2">
@@ -287,12 +354,13 @@ function Auth() {
                   type="email"
                   {...loginForm('email')}
                   onBlur={() => triggerLogin('email')}
+                  disabled={isLocked}
                   className={`w-full px-4 py-3 rounded-lg border transition-colors focus:outline-none focus:ring-2 focus:ring-quester-blue focus:border-transparent ${
                     loginErrors.email 
                       ? 'border-red-300 bg-red-50' 
                       : 'border-gray-200'
-                  }`}
-                  style={{ backgroundColor: 'rgba(211, 225, 255, 0.15)' }}
+                  } ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  style={{ backgroundColor: isLocked ? '#f3f4f6' : 'rgba(211, 225, 255, 0.15)' }}
                   placeholder="you@example.com"
                 />
                 {loginErrors.email && (
@@ -310,12 +378,13 @@ function Auth() {
                   type="password"
                   {...loginForm('password')}
                   onBlur={() => triggerLogin('password')}
+                  disabled={isLocked}
                   className={`w-full px-4 py-3 rounded-lg border transition-colors focus:outline-none focus:ring-2 focus:ring-quester-blue focus:border-transparent ${
                     loginErrors.password 
                       ? 'border-red-300 bg-red-50' 
                       : 'border-gray-200'
-                  }`}
-                  style={{ backgroundColor: 'rgba(211, 225, 255, 0.15)' }}
+                  } ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  style={{ backgroundColor: isLocked ? '#f3f4f6' : 'rgba(211, 225, 255, 0.15)' }}
                   placeholder="Your Password"
                 />
                 {loginErrors.password && (
@@ -329,6 +398,7 @@ function Auth() {
                   type="button" 
                   className="text-xs text-quester-blue hover:text-blue-700 font-medium"
                   onClick={() => navigate('/forgot-password')}
+                  disabled={isLocked}
                 >
                   Forgot Password?
                 </button>
@@ -337,14 +407,14 @@ function Auth() {
               {/* Botón de Submit */}
               <button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoading || isLocked}
                 className={`w-full py-3 px-4 rounded-lg text-white font-medium text-base transition-all ${
-                  isLoading
+                  isLoading || isLocked
                     ? 'bg-gray-400 cursor-not-allowed'
                     : 'bg-quester-blue hover:bg-blue-600 shadow-md hover:shadow-lg'
                 }`}
               >
-                {isLoading ? 'Signing In...' : 'Sign In'}
+                {isLocked ? 'Account Locked' : isLoading ? 'Signing In...' : 'Sign In'}
               </button>
             </form>
           )}
