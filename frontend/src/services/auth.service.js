@@ -156,6 +156,91 @@ class AuthService {
     sessionStorage.setItem('token', token);
     sessionStorage.setItem('user', JSON.stringify(user));
   }
+  
+  /**
+   * Tarea 54 - Guardar Paso 1 del Trip Builder
+   */
+  async saveTripStep1(token, data) {
+    try {
+      const response = await axios.post(`${API_URL}/trip/step1`, data, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Error saving trip step 1' };
+    }
+  }
+ 
+/**
+ * Tarea 68 - Guardar Paso 2 del Trip Builder
+ */
+  async saveTripStep2(token, data) {
+    try {
+      console.log('📤 authService.saveTripStep2 called');
+      console.log('Token:', token ? 'Present' : 'MISSING');
+      console.log('Data:', data);
+      console.log('API_URL:', API_URL);
+    
+      const response = await axios.post(`${API_URL}/trip/step2`, data, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+        }
+      });
+    
+      console.log('✅ authService.saveTripStep2 response status:', response.status);
+      console.log('✅ authService.saveTripStep2 response data:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ authService.saveTripStep2 error:', error);
+      console.error('❌ Error response:', error.response?.data);
+      console.error('❌ Error status:', error.response?.status);
+      console.error('❌ Error headers:', error.response?.headers);
+      throw error.response?.data || { message: 'Error saving trip step 2' };
+    }
+  }
+  
+  /**
+   * Tarea 80 - Guardar Paso 3 del Trip Builder
+   */
+  async saveTripStep3(token, data) {
+    try {
+      console.log('📤 authService.saveTripStep3 called');
+      console.log('Token:', token ? 'Present' : 'MISSING');
+      console.log('Data:', data);
+    
+      const response = await axios.post(`${API_URL}/trip/step3`, data, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+    
+      console.log('✅ authService.saveTripStep3 response status:', response.status);
+      console.log('✅ authService.saveTripStep3 response data:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ authService.saveTripStep3 error:', error);
+      console.error('❌ Error response:', error.response?.data);
+      throw error.response?.data || { message: 'Error saving trip step 3' };
+    }
+  }
+
+  async generateItinerary(token, payload) {
+    const response = await axios.post(
+      `${API_BASE_URL}/api/extraction`,
+      payload,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+    return response.data;
+  }  
 }
 
 export default new AuthService();

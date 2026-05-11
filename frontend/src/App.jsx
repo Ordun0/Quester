@@ -9,6 +9,8 @@ import Dashboard from './pages/Dashboard';
 import Profile from './pages/Profile';
 import TripBuilder from './pages/TripBuilder';  // ✅ Nuevo import para Trip Builder
 import authService from './services/auth.service';
+import Itinerary from './pages/Itinerary';
+import SavedItinerary from './pages/SavedItinerary';
 
 // ✅ Componente para rutas protegidas con mensaje de expiración (RF-06.03)
 function ProtectedRoute({ children }) {
@@ -159,6 +161,23 @@ function App() {
             </ProtectedRoute>
           } 
         />
+		
+		<Route 
+          path="/itinerary" 
+          element={
+            <ProtectedRoute>
+              <Itinerary />
+            </ProtectedRoute>
+          } 
+        />
+		
+		<Route 
+		  path="/itinerary/:tripId" 
+		  element={
+			  <SavedItinerary />
+		  } 
+		/>
+
         
         {/* Redirigir raíz */}
         <Route path="/" element={<Navigate to="/auth" replace />} />

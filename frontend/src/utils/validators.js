@@ -126,55 +126,71 @@ export const changePasswordSchema = z.object({
  * RF-01 - Esquema para Destino y Fechas (Trip Builder Paso 1)
  */
 export const destinationSchema = z.object({
+  origin: z  // ✅ NUEVO: Origen
+    .string()
+    .min(1, 'Origin is required')
+    .min(3, 'Origin must be at least 3 characters'),
+  
   destination: z
     .string()
-    .min(1, 'Destination is required')  // RF-01.01.01
+    .min(1, 'Destination is required')
     .min(3, 'Destination must be at least 3 characters'),
   
   startDate: z
     .string()
-    .min(1, 'Start date is required'),  // RF-01.02.01
+    .min(1, 'Start date is required'),
   
   endDate: z
     .string()
-    .min(1, 'End date is required')  // RF-01.02.02
+    .min(1, 'End date is required')
 });
 
 /**
- * RF-02 - Esquema para Viajeros e Intereses (Trip Builder Paso 2)
+ * RF-02, RF-03, RF-04 - Esquema para Viajeros, Intereses y Presupuesto (Paso 2)
  */
 export const travelersSchema = z.object({
   travelers: z
     .array(z.object({
       name: z.string().min(1, 'Traveler name is required'),
-      type: z.enum(['adult', 'child', 'infant'])
+      type: z.enum(['adult', 'child', 'infant']),
+      interests: z.array(z.string()).max(4, 'Maximum 4 interests per traveler').optional()  // ✅ RF-03.01.03
     }))
     .min(1, 'At least 1 traveler is required')
     .max(4, 'Maximum 4 travelers allowed'),
   
-  interests: z
-    .array(z.string())
-    .min(1, 'At least 1 interest is required')
-    .max(4, 'Maximum 4 interests allowed'),
-  
   budget: z
     .number()
-    .min(500, 'Minimum budget is $500'),
+    .min(500, 'Minimum budget is 500'),  // ✅ RF-04.02.01
   
-  currency: z.string().min(1, 'Currency is required')
+  currency: z.enum(['USD', 'MXN', 'EUR']),  // ✅ RF-04.01.02-04
+  
+  budgetDistribution: z.object({
+    flights: z.number().min(0).max(100).optional(),
+    hotels: z.number().min(0).max(100).optional(),
+    food: z.number().min(0).max(100).optional(),
+    activities: z.number().min(0).max(100).optional(),
+    transport: z.number().min(0).max(100).optional()
+  }).optional()  // ✅ RF-04.03 - Opcional
 });
 
 /**
- * RF-03 - Esquema para Preferencias (Trip Builder Paso 3)
+ * RF-03.02, RF-03.03, RF-03.04 - Esquema para Preferencias (Paso 3)
  */
 export const preferencesSchema = z.object({
-  hotelClass: z.number().min(1).max(5),
-  flightClass: z.enum(['economy', 'business', 'first']),
   preferences: z.object({
-    earlyStart: z.boolean(),
-    freeTime: z.boolean(),
-    photoStops: z.boolean(),
-    localFood: z.boolean(),
-    guidedTours: z.boolean()
-  })
+    avoidCrowds: z.boolean().optional(),  // ✅ RF-03.02.01
+    ecoFriendly: z.boolean().optional(),  // ✅ RF-03.02.02
+    wheelchairAccessible: z.boolean().optional(),  // ✅ RF-03.02.03
+    familyFriendly: z.boolean().optional(),  // ✅ RF-03.02.04
+    petFriendly: z.boolean().optional()  // ✅ RF-03.02.05
+  }).optional(),  // ✅ RF-03.02.06 - Opcional
+  
+  hotelClass: z.enum(['no-preference', '1', '2', '3', '4', '5']).optional(),  // ✅ RF-03.03 - Opcional
+  
+  flightClass: z.enum(['economy', 'business', 'first']).optional(),  // ✅ RF-03.04 - Opcional
+  
+  // ✅ RF-03.02.07 - TextField opcional con límite de 200 caracteres
+  customPreferences: z.string()
+    .max(200, 'Maximum 200 characters allowed')
+    .optional()
 });

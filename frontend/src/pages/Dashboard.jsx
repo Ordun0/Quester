@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import authService from '../services/auth.service';
+import tripsService from '../services/trips.service';  // ✅ Importar servicio de trips
 import logo from '../assets/logo.png';
 
 function Dashboard() {
@@ -10,6 +11,7 @@ function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState(null);
   const [trips, setTrips] = useState([]);
+  const [tripsLoading, setTripsLoading] = useState(false);  // ✅ Estado separado para trips
 
   // ✅ RF-04.01 - Cargar datos del usuario al montar
   useEffect(() => {
@@ -31,12 +33,12 @@ function Dashboard() {
       const userData = JSON.parse(storedUser);
       setUser(userData);
 
-      // ✅ Cargar viajes del usuario (Tarea 115-116)
+      // ✅ Cargar viajes del usuario desde backend (Tarea 115-116)
       await loadUserTrips(token);
     } catch (err) {
       console.error('Error loading dashboard:', err);
       if (err.error === 'TOKEN_EXPIRED' || err.error === 'INVALID_TOKEN') {
-        // ✅ RF-05.02 - Limpieza de tokens
+        // ✅ RF-05.02.01 - Limpieza de tokens
         authService.logout();
         navigate('/auth');
       }
@@ -45,42 +47,42 @@ function Dashboard() {
     }
   };
 
+  // ✅ ACTUALIZADO: Cargar trips reales desde backend
   const loadUserTrips = async (token) => {
+    setTripsLoading(true);
+    
     try {
-      // TODO: Conectar con endpoint GET /api/trips cuando esté listo
-      // Por ahora, datos mock para desarrollo
-      const mockTrips = [
-        {
-          tripId: 'trip_001',
-          destination: 'Tokyo, Japan',
-          startDate: '2026-03-15',
-          endDate: '2026-03-22',
-          budget: 3200,
-          spent: 2285,
-          status: 'planned'
-        },
-        {
-          tripId: 'trip_002',
-          destination: 'Barcelona, Spain',
-          startDate: '2026-05-05',
-          endDate: '2026-05-10',
-          budget: 1400,
-          spent: 1220,
-          status: 'planned'
-        },
-        {
-          tripId: 'trip_003',
-          destination: 'Guadalajara, Mexico',
-          startDate: '2026-10-20',
-          endDate: '2026-10-22',
-          budget: 2000,
-          spent: 880,
-          status: 'planned'
-        }
-      ];
-      setTrips(mockTrips);
+      // ✅ Llamar al endpoint real GET /api/trips
+      const result = await tripsService.getUserTrips(token);
+      
+      if (result.success && result.data?.trips) {
+        // ✅ Transformar datos del backend al formato de la UI
+        const formattedTrips = result.data.trips.map(trip => ({
+          tripId: trip.tripId,
+          destination: trip.destination || 'Unknown Destination',
+          startDate: trip.startDate,
+          endDate: trip.endDate,
+          // ✅ Calcular spent basado en budgetBreakdown o usar totalBudget como fallback
+          budget: trip.totalBudget || 0,
+          spent: trip.itinerary?.budgetBreakdown?.total || trip.totalBudget || 0,
+          status: trip.status || 'planned',
+          // ✅ Datos adicionales para la UI
+          itinerarySummary: trip.itinerarySummary,
+          currency: trip.currency || 'USD'
+        }));
+        
+        setTrips(formattedTrips);
+        console.log('✅ Loaded trips from backend:', formattedTrips.length);
+      } else {
+        console.warn('⚠️ No trips found or error in response:', result);
+        setTrips([]);
+      }
     } catch (err) {
-      console.error('Error loading trips:', err);
+      console.error('❌ Error loading trips from backend:', err);
+      // ✅ Fallback: mostrar array vacío en lugar de mock data
+      setTrips([]);
+    } finally {
+      setTripsLoading(false);
     }
   };
 
@@ -123,11 +125,13 @@ function Dashboard() {
 
   // ✅ Calcular progreso de presupuesto
   const getBudgetProgress = (spent, budget) => {
+    if (!budget || budget === 0) return 0;
     const percentage = Math.min((spent / budget) * 100, 100);
     return percentage.toFixed(0);
   };
 
   const getBudgetStatus = (spent, budget) => {
+    if (!budget || budget === 0) return 'text-gray-600';
     const percentage = (spent / budget) * 100;
     if (percentage >= 100) return 'text-red-600';
     if (percentage >= 75) return 'text-yellow-600';
@@ -135,6 +139,7 @@ function Dashboard() {
   };
 
   const getProgressBarColor = (spent, budget) => {
+    if (!budget || budget === 0) return 'bg-gray-400';
     const percentage = (spent / budget) * 100;
     if (percentage >= 100) return 'bg-red-500';
     if (percentage >= 75) return 'bg-yellow-500';
@@ -143,11 +148,30 @@ function Dashboard() {
 
   // ✅ Formatear fechas
   const formatDate = (dateString) => {
+    if (!dateString) return 'TBD';
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
-  // Loading state
+  // ✅ Formatear moneda
+  const formatCurrency = (amount, currency = 'USD') => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currency,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount || 0);
+  };
+
+  // ✅ Recargar trips manualmente (para refresh después de guardar)
+  const handleRefreshTrips = () => {
+    const token = authService.getToken();
+    if (token) {
+      loadUserTrips(token);
+    }
+  };
+
+  // Loading state principal
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -206,11 +230,28 @@ function Dashboard() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
         {/* Welcome Section */}
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold text-quester-dark">
-            Welcome Back, {user?.nombreCompleto?.split(' ')[0] || 'Traveler'} 👋
-          </h2>
-          <p className="text-gray-600 mt-2">Where are we going today?</p>
+        <div className="mb-8 flex justify-between items-end">
+          <div>
+            <h2 className="text-3xl font-bold text-quester-dark">
+              Welcome Back, {user?.nombreCompleto?.split(' ')[0] || 'Traveler'} 👋
+            </h2>
+            <p className="text-gray-600 mt-2">Where are we going today?</p>
+          </div>
+          
+          {/* Refresh Button (solo visible si hay trips) */}
+          {trips.length > 0 && (
+            <button
+              onClick={handleRefreshTrips}
+              disabled={tripsLoading}
+              className="flex items-center gap-2 text-sm text-gray-600 hover:text-quester-blue font-medium transition-colors disabled:opacity-50"
+              title="Refresh trips"
+            >
+              <svg className={`w-4 h-4 ${tripsLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Refresh
+            </button>
+          )}
         </div>
 
         {/* Create Quest Button */}
@@ -227,21 +268,41 @@ function Dashboard() {
         </div>
 
         {/* My Quests Section */}
-        <div className="mb-6">
+        <div className="mb-6 flex justify-between items-center">
           <h3 className="text-xl font-semibold text-quester-dark">My Quests</h3>
+          {tripsLoading && (
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-quester-blue"></div>
+              Loading trips...
+            </div>
+          )}
         </div>
 
         {/* Trips Grid */}
-        {trips.length > 0 ? (
+        {tripsLoading && trips.length === 0 ? (
+          // Loading skeleton
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 animate-pulse">
+                <div className="h-6 bg-gray-200 rounded w-3/4 mb-4"></div>
+                <div className="h-4 bg-gray-200 rounded w-1/2 mb-3"></div>
+                <div className="h-4 bg-gray-200 rounded w-1/3 mb-4"></div>
+                <div className="h-2 bg-gray-200 rounded w-full mb-4"></div>
+                <div className="h-4 bg-gray-200 rounded w-1/4"></div>
+              </div>
+            ))}
+          </div>
+        ) : trips.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {trips.map((trip) => (
               <div
                 key={trip.tripId}
-                className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow"
+                className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow cursor-pointer group"
+                onClick={() => navigate(`/itinerary/${trip.tripId}`)}
               >
                 {/* Card Header */}
                 <div className="p-6">
-                  <h4 className="text-lg font-semibold text-quester-dark mb-4">
+                  <h4 className="text-lg font-semibold text-quester-dark mb-4 group-hover:text-quester-blue transition-colors">
                     {trip.destination}
                   </h4>
 
@@ -259,7 +320,7 @@ function Dashboard() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     <span className={getBudgetStatus(trip.spent, trip.budget)}>
-                      ${trip.spent.toLocaleString()} / ${trip.budget.toLocaleString()}
+                      {formatCurrency(trip.spent, trip.currency)} / {formatCurrency(trip.budget, trip.currency)}
                     </span>
                   </div>
 
@@ -272,22 +333,24 @@ function Dashboard() {
                   </div>
 
                   {/* View Itinerary Link */}
-                  <Link
-                    to={`/trips/${trip.tripId}`}
-                    className="inline-flex items-center gap-1 text-sm text-quester-blue hover:text-blue-700 font-medium transition-colors"
-                  >
+                  <div className="inline-flex items-center gap-1 text-sm text-quester-blue font-medium transition-colors">
                     View Itinerary
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
-                  </Link>
+                  </div>
                 </div>
 
                 {/* Card Footer */}
-                <div className="px-6 py-3 bg-gray-50 border-t border-gray-100">
+                <div className="px-6 py-3 bg-gray-50 border-t border-gray-100 flex justify-between items-center">
                   <span className="text-xs text-gray-500 capitalize">
                     Status: {trip.status}
                   </span>
+                  {trip.itinerarySummary?.dailyPlanCount && (
+                    <span className="text-xs text-gray-400">
+                      {trip.itinerarySummary.dailyPlanCount} days
+                    </span>
+                  )}
                 </div>
               </div>
             ))}
@@ -309,7 +372,7 @@ function Dashboard() {
           </div>
         )}
 
-        {/* Quick Stats (Opcional) */}
+        {/* Quick Stats (Opcional) - Solo si hay trips */}
         {trips.length > 0 && (
           <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -335,9 +398,9 @@ function Dashboard() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-quester-dark">
-                    {trips.filter(t => t.status === 'planned').length}
+                    {trips.filter(t => t.status === 'completed').length}
                   </p>
-                  <p className="text-sm text-gray-600">Planned</p>
+                  <p className="text-sm text-gray-600">Completed</p>
                 </div>
               </div>
             </div>
@@ -351,7 +414,7 @@ function Dashboard() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-quester-dark">
-                    ${trips.reduce((acc, trip) => acc + trip.spent, 0).toLocaleString()}
+                    {formatCurrency(trips.reduce((acc, trip) => acc + (trip.spent || 0), 0), trips[0]?.currency)}
                   </p>
                   <p className="text-sm text-gray-600">Total Spent</p>
                 </div>

@@ -10,24 +10,39 @@ import Step3Preferences from '../components/trip-builder/Step3Preferences';
 function TripBuilder() {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
+  
+  // ✅ Estado inicial con estructura APLANADA para fácil acceso
   const [tripData, setTripData] = useState({
-    // Paso 1
+    // ✅ Datos de Step 1 (aplanados en raíz)
+    sessionId: '',
+    origin: '',
     destination: '',
     startDate: '',
     endDate: '',
     duration: 0,
     
-    // Paso 2
+    // ✅ Datos de Step 2 (aplanados en raíz)
     travelers: [],
-    interests: [],
     budget: 0,
     currency: 'USD',
     budgetDistribution: {},
     
-    // Paso 3
-    preferences: {},
-    hotelClass: 3,
-    flightClass: 'economy'
+    // ✅ Datos de Step 3 (aplanados en raíz)
+    preferences: {
+      avoidCrowds: false,
+      ecoFriendly: false,
+      wheelchairAccessible: false,
+      familyFriendly: false,
+      petFriendly: false
+    },
+    hotelClass: 'no-preference',
+    flightClass: 'economy',
+    customPreferences: '',
+    
+    // ✅ Referencias anidadas por paso (para debugging y compatibilidad)
+    step1: {},
+    step2: {},
+    step3: {}
   });
   
   const [isStep1Valid, setIsStep1Valid] = useState(false);
@@ -42,12 +57,67 @@ function TripBuilder() {
     }
   }, [navigate]);
 
-  // Actualizar datos del viaje
+  // ✅ ACTUALIZADO: Actualizar datos del viaje con aplanamiento inteligente
   const updateTripData = (step, data) => {
-    setTripData(prev => ({
-      ...prev,
-      ...data
-    }));
+    console.log('📦 updateTripData called');
+    console.log('Step:', step);
+    console.log('Data:', data);
+  
+    setTripData(prev => {
+      // ✅ Guardar los datos del paso en su clave correspondiente (para referencia)
+      const stepData = {
+        ...(prev[step] || {}),
+        ...data
+      };
+
+      // ✅ Aplanar los datos importantes a la raíz para fácil acceso
+      const flattenedData = { ...prev };
+
+      if (step === 'step1') {
+        // Paso 1: destination, startDate, endDate, duration, origin, sessionId
+        if (data.sessionId !== undefined) flattenedData.sessionId = data.sessionId;
+        if (data.origin !== undefined) flattenedData.origin = data.origin;
+        if (data.destination !== undefined) flattenedData.destination = data.destination;
+        if (data.startDate !== undefined) flattenedData.startDate = data.startDate;
+        if (data.endDate !== undefined) flattenedData.endDate = data.endDate;
+        if (data.duration !== undefined) flattenedData.duration = data.duration;
+      }
+      
+      if (step === 'step2') {
+        // Paso 2: travelers, budget, currency, budgetDistribution, sessionId
+        if (data.sessionId !== undefined) flattenedData.sessionId = data.sessionId;
+        if (data.travelers !== undefined) flattenedData.travelers = data.travelers;
+        if (data.budget !== undefined) flattenedData.budget = data.budget;
+        if (data.currency !== undefined) flattenedData.currency = data.currency;
+        if (data.budgetDistribution !== undefined) flattenedData.budgetDistribution = data.budgetDistribution;
+      }
+      
+      if (step === 'step3') {
+        // Paso 3: preferences, hotelClass, flightClass, customPreferences
+        if (data.preferences !== undefined) flattenedData.preferences = data.preferences;
+        if (data.hotelClass !== undefined) flattenedData.hotelClass = data.hotelClass;
+        if (data.flightClass !== undefined) flattenedData.flightClass = data.flightClass;
+        if (data.customPreferences !== undefined) flattenedData.customPreferences = data.customPreferences;
+      }
+
+      // ✅ Guardar también en la clave del paso para referencia/debugging
+      flattenedData[step] = stepData;
+
+      console.log('✅ New tripData (flattened):', {
+        sessionId: flattenedData.sessionId,
+        origin: flattenedData.origin,
+        destination: flattenedData.destination,
+        startDate: flattenedData.startDate,
+        endDate: flattenedData.endDate,
+        duration: flattenedData.duration,
+        travelers: flattenedData.travelers?.length,
+        budget: flattenedData.budget,
+        currency: flattenedData.currency,
+        budgetDistribution: flattenedData.budgetDistribution
+      });
+      
+      return flattenedData;
+    });
   };
 
   // Navegar entre pasos
@@ -61,6 +131,37 @@ function TripBuilder() {
   const handleBackToDashboard = () => {
     navigate('/dashboard');
   };
+
+  // ✅ Manejar finalización del Step 3 (generar itinerario)
+  const handleFinalSubmit = () => {
+    console.log('🎉 Final trip data ready for itinerary generation:', {
+      destination: tripData.destination,
+      startDate: tripData.startDate,
+      endDate: tripData.endDate,
+      duration: tripData.duration,
+      travelers: tripData.travelers,
+      budget: tripData.budget,
+      currency: tripData.currency,
+      preferences: tripData.preferences,
+      hotelClass: tripData.hotelClass,
+      flightClass: tripData.flightClass
+    });
+    
+    // ✅ Step3Preferences se encarga de llamar al backend y navegar a /itinerary
+    // Esta función es un fallback por si el onSubmit no navega
+    navigate('/itinerary');
+  };
+
+  // ✅ Debug: Verificar cambios en tripData
+  useEffect(() => {
+    console.log('🔍 tripData actualizado:', {
+      sessionId: tripData.sessionId,
+      destination: tripData.destination,
+      budget: tripData.budget,
+      travelers: tripData.travelers?.length,
+      step: currentStep
+    });
+  }, [tripData, currentStep]);
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
@@ -197,10 +298,7 @@ function TripBuilder() {
                 updateTripData={updateTripData}
                 onValid={(isValid) => setIsStep3Valid(isValid)}
                 onBack={() => goToStep(2)}
-                onSubmit={() => {
-                  // TODO: Submit to backend (Tarea 105)
-                  alert('Trip submission will be implemented in Task 105');
-                }}
+                onFinalSubmit={handleFinalSubmit}  // ✅ Pasar callback para navegación final
               />
             )}
 
