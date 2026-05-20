@@ -5,7 +5,7 @@ import { preferencesSchema } from '../../utils/validators';
 import { useNavigate } from 'react-router-dom';
 
 // ✅ URL del backend para desarrollo (ajustar según tu configuración)
-const API_BASE_URL = import.meta?.env?.VITE_AWS_BACKEND_URL || 'http://localhost:3000/api';
+const API_BASE_URL = import.meta?.env?.VITE_AWS_BACKEND_URL || 'http://100.48.137.197:3000/api';
 
 function Step3Preferences({ tripData, updateTripData, onValid, onBack }) {
   const navigate = useNavigate();

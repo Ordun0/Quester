@@ -3,7 +3,7 @@ import { useNavigate, Link, useLocation } from 'react-router-dom';
 import logo from '../../assets/logo.png';
 
 // ✅ URL del backend para desarrollo (ajustar según tu configuración)
-const API_BASE_URL = import.meta?.env?.VITE_AWS_BACKEND_URL || 'http://localhost:3000';
+const API_BASE_URL = import.meta?.env?.VITE_AWS_BACKEND_URL || 'http://100.48.137.197:3000/api';
 
 function ItineraryView({ 
   itineraryData, 
@@ -309,36 +309,42 @@ function ItineraryView({
 
       const result = await response.json();
       console.log('✅ Regeneration response:', result);
-      
+	  
+	  // ✅ En handleRegenerateItinerary, reemplazar el bloque de éxito con:
+
       if (result.success) {
         alert('Itinerary regenerated successfully!');
         setShowRegenerateModal(false);
         setRegenerateComments('');
-        
-        if (result.data?.tripId) {
-          console.log('🔄 [Regenerate] Saving regenerated itinerary to sessionStorage');
-          
-          // ✅ Normalizar estructura para asegurar compatibilidad con Itinerary.jsx
-          const dataToSave = {
-            extraction: result.data.extraction || result.data,
-            itinerary: result.data.itinerary || result.data
-          };
-          
-          // ✅ Guardar en sessionStorage (síncrono)
-          sessionStorage.setItem('itineraryData', JSON.stringify(dataToSave));
-          
-          // ✅ Forzar recarga REAL del navegador con query param único
-          // Esto evita que React Router intercepte y asegura carga fresca
-          setTimeout(() => {
-            window.location.href = '/itinerary?regenerated=' + Date.now();
-          }, 150);  // Pequeño delay para asegurar que sessionStorage se guarde
-        } else {
-          window.location.reload();
+  
+  // ✅ Normalizar estructura para compatibilidad
+        const dataToSave = {
+          extraction: result.data.extraction || result.data,
+          itinerary: result.data.itinerary || result.data
+        };
+  
+  // ✅ Siempre guardar en sessionStorage (backup)
+        sessionStorage.setItem('itineraryData', JSON.stringify(dataToSave));
+  
+  // ✅ Siempre llamar callback para actualización directa (si existe)
+        if (typeof onItineraryUpdated === 'function') {
+          console.log('🔄 [Regenerate] Calling onItineraryUpdated callback');
+          const updated = onItineraryUpdated(dataToSave);
+          if (updated) {
+            console.log('✅ [Regenerate] Parent component updated via callback');
+          }
         }
-      } else {
-        throw new Error(result.message || 'Failed to regenerate itinerary');
-      }
-      
+  
+  // ✅ Siempre forzar recarga con query param para garantizar carga fresca
+  // Esto asegura que Itinerary.jsx detecte el cambio via location.search
+        setTimeout(() => {
+          window.location.href = '/itinerary?regenerated=' + Date.now();
+        }, 100);  // Delay mínimo para asegurar que sessionStorage/callback se ejecuten
+  
+    } else {
+      throw new Error(result.message || 'Failed to regenerate itinerary');
+    }
+            
     } catch (err) {
       console.error('❌ Regeneration error:', err);
       // ✅ RF-08.04: Mensajes específicos en alert

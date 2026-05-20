@@ -7,74 +7,31 @@ import tripsService from '../services/trips.service';
 
 function Itinerary() {
   const navigate = useNavigate();
-  const location = useLocation();
+  const location = useLocation();  // ✅ Necesario para detectar location.search
   const [itineraryData, setItineraryData] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState(null);
   const [isExporting, setIsExporting] = useState(false);
-  const [isRegenerating, setIsRegenerating] = useState(false);  // ✅ Feedback visual para regeneración
+  const [isRegenerating, setIsRegenerating] = useState(false);
 
-  // ✅ CALLBACK para actualizar itinerario directamente (sin navegar)
-  // Se llama desde ItineraryView.jsx después de regeneración exitosa
+  // ✅ CALLBACK para actualizar itinerario directamente
   const handleItineraryUpdated = useCallback((newData) => {
     console.log('🔄 [Itinerary] Direct update received, updating state');
     
-    // ✅ Validar estructura antes de actualizar
     if (newData?.itinerary?.dailyPlan && Array.isArray(newData.itinerary.dailyPlan)) {
-      // ✅ Actualizar sessionStorage como backup
       sessionStorage.setItem('itineraryData', JSON.stringify(newData));
-      
-      // ✅ Actualizar estado local → re-render automático de ItineraryView
       setItineraryData(newData);
-      
-      // ✅ Feedback visual opcional
       console.log('✅ [Itinerary] State updated directly with new itinerary');
-      
-      // ✅ Resetear estado de regeneración
       setIsRegenerating(false);
-      
       return true;
     } else {
       console.error('❌ [Itinerary] Invalid data structure in update callback');
       setIsRegenerating(false);
       return false;
     }
-  }, []);  // ✅ useCallback para estabilidad de referencia
+  }, []);
 
-  // ✅ useEffect para detectar regeneración vía location.state (fallback)
-  useEffect(() => {
-    if (location.state?.__key || location.state?.regenerated) {
-      console.log('🔄 [Itinerary] Detected regeneration via state, syncing...');
-      
-      const stored = sessionStorage.getItem('itineraryData');
-      if (stored) {
-        try {
-          const parsed = JSON.parse(stored);
-          let data;
-          if (parsed?.itinerary && parsed?.extraction) {
-            data = parsed;
-          } else if (parsed?.data?.itinerary) {
-            data = parsed.data;
-          } else if (parsed?.dailyPlan) {
-            data = { itinerary: parsed, extraction: {} };
-          } else {
-            throw new Error('Invalid itinerary structure');
-          }
-          
-          if (data?.itinerary?.dailyPlan && Array.isArray(data.itinerary.dailyPlan)) {
-            setItineraryData(data);
-          }
-        } catch (e) {
-          console.error('❌ Error parsing itinerary:', e);
-        }
-      }
-      
-      // ✅ Limpiar state para evitar re-uso
-      window.history.replaceState({}, document.title);
-    }
-  }, [location.state?.__key, location.state?.regenerated]);
-
-  // ✅ useEffect principal: Carga inicial desde sessionStorage
+  // ✅ useEffect principal: Carga inicial + DETECCIÓN DE REGENERACIÓN VIA QUERY PARAM
   useEffect(() => {
     const loadItinerary = () => {
       const stored = sessionStorage.getItem('itineraryData');
@@ -97,14 +54,13 @@ function Itinerary() {
           throw new Error('Invalid itinerary structure');
         }
         
-        // ✅ Validar estructura mínima
         if (!data?.itinerary?.dailyPlan || !Array.isArray(data.itinerary.dailyPlan)) {
           sessionStorage.removeItem('itineraryData');
           navigate('/trip-builder');
           return;
         }
         
-        // ✅ Validar presupuesto (RF-04.05 + RF-08.02)
+        // ✅ Validar presupuesto
         const summary = data.itinerary?.summary || data.summary;
         const budgetBreakdown = data.itinerary?.budgetBreakdown || data.budgetBreakdown;
         
@@ -113,13 +69,6 @@ function Itinerary() {
           const estimatedCost = budgetBreakdown.total;
           
           if (estimatedCost > userBudget) {
-            console.warn('⚠️ [BudgetError] Itinerary cost exceeds user budget', {
-              userBudget,
-              estimatedCost,
-              difference: estimatedCost - userBudget,
-              currency: summary.currency
-            });
-            
             sessionStorage.removeItem('itineraryData');
             navigate('/budget-error', {
               state: {
@@ -142,13 +91,12 @@ function Itinerary() {
     };
 
     loadItinerary();
-  }, [navigate]);
+  }, [navigate, location.search]);  // ✅ Agregar location.search para detectar regeneración
 
-  // ✅ Función para verificar límite de viajes guardados (RF-06.02)
+  // ✅ Función para verificar límite de viajes guardados
   const checkTripLimit = async (token) => {
     try {
       const result = await tripsService.getUserTrips(token);
-      
       if (result.success && result.data?.trips) {
         const activeTrips = result.data.trips.filter(trip => trip.status !== 'deleted');
         return activeTrips.length;
@@ -160,7 +108,7 @@ function Itinerary() {
     }
   };
 
-  // ✅ Guardar itinerario en quester-trips (SOLO al presionar botón)
+  // ✅ Guardar itinerario
   const handleSaveTrip = async () => {
     if (!itineraryData?.itinerary) return;
     
@@ -174,7 +122,6 @@ function Itinerary() {
         return;
       }
 
-      // ✅ RF-06.02: Verificar límite de 6 viajes guardados
       const tripCount = await checkTripLimit(token);
       
       if (tripCount >= 6) {
@@ -206,7 +153,7 @@ function Itinerary() {
       
       if (result.success) {
         setSaveStatus('success');
-        console.log('✅ Itinerary saved to quester-trips:', result.data.tripId);
+        console.log('✅ Itinerary saved:', result.data.tripId);
         sessionStorage.setItem('currentTripId', result.data.tripId);
         setTimeout(() => setSaveStatus(null), 3000);
       } else {
@@ -220,7 +167,7 @@ function Itinerary() {
     }
   };
 
-  // ✅ Exportar itinerario a PDF
+  // ✅ Exportar a PDF (sin cambios)
   const handleExportPDF = async () => {
     if (!itineraryData?.itinerary) return;
     
@@ -346,7 +293,6 @@ function Itinerary() {
     }
   };
 
-  // ✅ Helper para formato de moneda (para el PDF)
   const formatCurrency = (amount, currency = 'USD') => {
     if (!amount) return '$0';
     return new Intl.NumberFormat('en-US', {
@@ -370,10 +316,10 @@ function Itinerary() {
       itineraryData={itineraryData}
       onSaveTrip={handleSaveTrip}
       onExportPDF={handleExportPDF}
-      onItineraryUpdated={handleItineraryUpdated}  // ✅ NUEVO: Callback para actualización directa
+      onItineraryUpdated={handleItineraryUpdated}
       isSaving={isSaving}
       isExporting={isExporting}
-      isRegenerating={isRegenerating}  // ✅ NUEVO: Estado para feedback visual
+      isRegenerating={isRegenerating}
       saveStatus={saveStatus}
       actionType="save"
     />
