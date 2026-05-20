@@ -1,16 +1,38 @@
 const { v4: uuidv4 } = require('uuid');
 const gcpService = require('../services/gcpService');
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
-const { PutCommand } = require('@aws-sdk/lib-dynamodb');
+const { PutCommand, GetCommand, QueryCommand, UpdateCommand } = require('@aws-sdk/lib-dynamodb');
 
 const docClient = new DynamoDBClient({ region: process.env.AWS_REGION });
 
+// ✅ Función helper para calcular costo total REAL incluyendo vuelos y hoteles
+const calculateEstimatedTotal = (itineraryData, selectedFlights, selectedHotel) => {
+  const breakdown = itineraryData?.budgetBreakdown || {};
+  let total = 0;
+  
+  // ✅ VUELOS: Sumar ida y vuelta desde selectedFlights (estructura { outbound, return })
+  if (selectedFlights?.outbound?.price?.amount) {
+    total += selectedFlights.outbound.price.amount;
+  }
+  if (selectedFlights?.return?.price?.amount) {
+    total += selectedFlights.return.price.amount;
+  }
+  
+  // ✅ HOTEL: Usar totalPrice desde selectedHotel
+  if (selectedHotel?.totalPrice?.amount) {
+    total += selectedHotel.totalPrice.amount;
+  }
+  
+  // ✅ CATEGORÍAS DEL BREAKDOWN: food, activities, transport (de Gemini)
+  total += breakdown.food || 0;
+  total += breakdown.activities || 0;
+  total += breakdown.transport || 0;
+  
+  return total;
+};
+
 /**
  * TAREA 102-104: Generar itinerario completo con IA
- * - Valida datos de entrada
- * - Llama a GCP para enriquecer datos y generar itinerario
- * - Guarda resultado en DynamoDB
- * - Retorna respuesta estructurada para frontend
  */
 exports.generateItinerary = async (req, res) => {
   const requestId = `req_${uuidv4()}`;
@@ -71,7 +93,7 @@ exports.generateItinerary = async (req, res) => {
       });
     }
 
-    // ✅ VALIDAR PRESUPUESTO
+    // ✅ VALIDAR PRESUPUESTO MÍNIMO
     if (budget?.total && budget.total < 100) {
       return res.status(400).json({
         success: false,
@@ -115,10 +137,62 @@ exports.generateItinerary = async (req, res) => {
 
     const itineraryData = result.data;
 
+    // ✅ Calcular estimatedTotal REAL incluyendo vuelos y hoteles
+    const userBudget = budget?.total || 0;
+    const estimatedTotal = calculateEstimatedTotal(
+      itineraryData, 
+      itineraryData.flights, 
+      itineraryData.selectedHotel
+    );
+    const currency = budget?.currency || 'USD';
+
+    // ✅ Validar si excede presupuesto (RF-04.04 + RF-04.05 + RF-08.02)
+    if (userBudget > 0 && estimatedTotal > userBudget) {
+      console.warn('⚠️ [BudgetValidation] Itinerary exceeds user budget', {
+        requestId,
+        userBudget,
+        estimatedTotal,
+        difference: estimatedTotal - userBudget,
+        currency
+      });
+      
+      return res.status(400).json({
+        success: false,
+        error: 'BUDGET_EXCEEDED',
+        message: 'Sorry, I cannot create an itinerary with this budget. Please increase it.',
+        requestId,
+        data: {
+          userBudget,
+          estimatedTotal,
+          currency,
+          difference: estimatedTotal - userBudget,
+          breakdown: {
+            flights: (itineraryData.flights?.optimalFlight?.price?.amount || 0) + 
+                     (itineraryData.flights?.returnFlight?.price?.amount || 0),
+            hotels: itineraryData.selectedHotel?.totalPrice?.amount || 0,
+            food: itineraryData.budgetBreakdown?.food || 0,
+            activities: itineraryData.budgetBreakdown?.activities || 0,
+            transport: itineraryData.budgetBreakdown?.transport || 0
+          }
+        }
+      });
+    }
+
+    console.log('✅ [BudgetValidation] Itinerary is within budget, proceeding to save');
+
     // ✅ PREPARAR DATOS PARA DYNAMODB
     const timestamp = Date.now();
     const tripId = result.itineraryId || `trip_${uuidv4()}`;
     const ttl = Math.floor((timestamp + 30 * 24 * 60 * 60 * 1000) / 1000); // 30 días TTL
+
+    // ✅ Calcular spent SIN contingency (solo las 5 categorías principales)
+    const budgetBreakdown = itineraryData.budgetBreakdown || {};
+    const spentWithoutContingency = 
+      (budgetBreakdown.flights || 0) +
+      (budgetBreakdown.hotels || 0) +
+      (budgetBreakdown.food || 0) +
+      (budgetBreakdown.activities || 0) +
+      (budgetBreakdown.transport || 0);
 
     const dbItem = {
       tripId,
@@ -126,6 +200,8 @@ exports.generateItinerary = async (req, res) => {
       timestamp,
       ttl,
       status: 'completed',
+      spent: spentWithoutContingency,
+      
       // Datos originales del request
       tripData: {
         origin: tripData.origin,
@@ -137,6 +213,7 @@ exports.generateItinerary = async (req, res) => {
       travelers: travelers || [],
       budget: budget || {},
       preferences: preferences || {},
+      
       // Itinerario generado por Gemini
       itinerary: {
         summary: itineraryData.summary,
@@ -146,7 +223,8 @@ exports.generateItinerary = async (req, res) => {
         travelTips: itineraryData.travelTips,
         emergencyContacts: itineraryData.emergencyContacts
       },
-      // Datos enriquecidos para frontend (mapas, reservas, etc.)
+      
+      // Datos enriquecidos para frontend
       enrichedData: {
         selectedHotel: itineraryData.selectedHotel,
         selectedRestaurants: itineraryData.selectedRestaurants,
@@ -155,7 +233,8 @@ exports.generateItinerary = async (req, res) => {
         transport: itineraryData.transport,
         flights: itineraryData.flights
       },
-      // Metadatos para analytics y debugging
+      
+      // Metadatos
       metadata: {
         generatedAt: new Date().toISOString(),
         generationDuration: result.totalDuration,
@@ -166,7 +245,7 @@ exports.generateItinerary = async (req, res) => {
     };
 
     // ✅ GUARDAR EN DYNAMODB
-    console.log('💾 Saving to DynamoDB...', { requestId, tripId });
+    console.log('💾 Saving to DynamoDB...', { requestId, tripId, spent: spentWithoutContingency });
     
     await docClient.send(new PutCommand({
       TableName: process.env.DYNAMODB_TABLE_TRIPS,
@@ -181,34 +260,20 @@ exports.generateItinerary = async (req, res) => {
     });
 
     // ✅ PREPARAR RESPUESTA PARA FRONTEND
-    // Solo enviar lo necesario, no todo el objeto de DB
     const responseData = {
-      // Metadatos de la respuesta
       tripId,
       generatedAt: new Date().toISOString(),
-      
-      // Resumen del viaje (para cards, headers, etc.)
       summary: itineraryData.summary,
-      
-      // Itinerario día por día (para vista principal)
       dailyPlan: itineraryData.dailyPlan,
-      
-      // Presupuesto (para vista de costos)
       budgetBreakdown: itineraryData.budgetBreakdown,
-      
-      // Listas útiles (para secciones laterales)
       packingList: itineraryData.packingList,
       travelTips: itineraryData.travelTips,
       emergencyContacts: itineraryData.emergencyContacts,
-      
-      // Datos enriquecidos para funcionalidades avanzadas
       places: {
         hotel: itineraryData.selectedHotel,
         restaurants: itineraryData.selectedRestaurants?.slice(0, 10) || [],
         attractions: itineraryData.selectedAttractions?.slice(0, 15) || []
       },
-      
-      // Datos para mapas y navegación
       coordinates: {
         hotel: itineraryData.selectedHotel?.gps || null,
         restaurants: itineraryData.selectedRestaurants?.map(r => ({
@@ -220,14 +285,10 @@ exports.generateItinerary = async (req, res) => {
           gps: a.gps
         })) || []
       },
-      
-      // Datos de vuelo y transporte
       travel: {
         flight: itineraryData.flights?.optimalFlight,
         transport: itineraryData.transport
       },
-      
-      // Clima (para notificaciones y recomendaciones)
       weather: itineraryData.weather
     };
 
@@ -247,7 +308,6 @@ exports.generateItinerary = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
 
-    // ✅ MANEJO DE ERRORES ESPECÍFICOS
     if (error.message?.includes('UNAUTHORIZED')) {
       return res.status(401).json({
         success: false,
@@ -287,7 +347,6 @@ exports.generateItinerary = async (req, res) => {
       });
     }
 
-    // ✅ ERROR GENÉRICO
     res.status(500).json({
       success: false,
       error: 'INTERNAL_SERVER_ERROR',
@@ -311,7 +370,6 @@ exports.getItinerary = async (req, res) => {
   console.log('=== 📥 Get Itinerary Request ===', { tripId, userId });
 
   try {
-    // ✅ VALIDAR tripId
     if (!tripId || !tripId.startsWith('trip_')) {
       return res.status(400).json({
         success: false,
@@ -320,9 +378,6 @@ exports.getItinerary = async (req, res) => {
       });
     }
 
-    // ✅ CONSULTAR DYNAMODB
-    const { GetCommand } = require('@aws-sdk/lib-dynamodb');
-    
     const result = await docClient.send(new GetCommand({
       TableName: process.env.DYNAMODB_TABLE_TRIPS,
       Key: { tripId }
@@ -336,7 +391,6 @@ exports.getItinerary = async (req, res) => {
       });
     }
 
-    // ✅ VALIDAR PERMISOS (opcional: solo el dueño puede ver)
     if (result.Item.userId !== userId && userId !== 'admin') {
       return res.status(403).json({
         success: false,
@@ -345,7 +399,6 @@ exports.getItinerary = async (req, res) => {
       });
     }
 
-    // ✅ RETORNAR ITINERARIO
     res.status(200).json({
       success: true,
       data: {
@@ -365,7 +418,6 @@ exports.getItinerary = async (req, res) => {
 
   } catch (error) {
     console.error('❌ getItinerary error:', error.message);
-    
     res.status(500).json({
       success: false,
       error: 'INTERNAL_SERVER_ERROR',
@@ -384,18 +436,13 @@ exports.listItineraries = async (req, res) => {
   console.log('=== 📋 List Itineraries Request ===', { userId, limit });
 
   try {
-    // ✅ CONSULTAR DYNAMODB CON QUERY
-    const { QueryCommand } = require('@aws-sdk/lib-dynamodb');
-    
     const params = {
       TableName: process.env.DYNAMODB_TABLE_TRIPS,
-      IndexName: 'userId-index', // Asegúrate de crear este GSI en DynamoDB
+      IndexName: 'userId-index',
       KeyConditionExpression: 'userId = :userId',
-      ExpressionAttributeValues: {
-        ':userId': userId
-      },
+      ExpressionAttributeValues: { ':userId': userId },
       Limit: parseInt(limit),
-      ScanIndexForward: false // Más recientes primero
+      ScanIndexForward: false
     };
 
     if (lastKey) {
@@ -404,7 +451,6 @@ exports.listItineraries = async (req, res) => {
 
     const result = await docClient.send(new QueryCommand(params));
 
-    // ✅ TRANSFORMAR RESULTADOS
     const itineraries = result.Items?.map(item => ({
       tripId: item.tripId,
       destination: item.tripData?.destination,
@@ -416,7 +462,6 @@ exports.listItineraries = async (req, res) => {
       createdAt: new Date(item.timestamp).toISOString()
     })) || [];
 
-    // ✅ PREPARAR NEXT TOKEN PARA PAGINACIÓN
     let nextToken = null;
     if (result.LastEvaluatedKey) {
       nextToken = Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString('base64');
@@ -436,7 +481,6 @@ exports.listItineraries = async (req, res) => {
 
   } catch (error) {
     console.error('❌ listItineraries error:', error.message);
-    
     res.status(500).json({
       success: false,
       error: 'INTERNAL_SERVER_ERROR',
@@ -455,7 +499,6 @@ exports.deleteItinerary = async (req, res) => {
   console.log('=== 🗑️ Delete Itinerary Request ===', { tripId, userId });
 
   try {
-    // ✅ VALIDAR tripId
     if (!tripId || !tripId.startsWith('trip_')) {
       return res.status(400).json({
         success: false,
@@ -464,9 +507,6 @@ exports.deleteItinerary = async (req, res) => {
       });
     }
 
-    // ✅ CONSULTAR PRIMERO PARA VALIDAR PERMISOS
-    const { GetCommand, UpdateCommand } = require('@aws-sdk/lib-dynamodb');
-    
     const getResult = await docClient.send(new GetCommand({
       TableName: process.env.DYNAMODB_TABLE_TRIPS,
       Key: { tripId }
@@ -480,7 +520,6 @@ exports.deleteItinerary = async (req, res) => {
       });
     }
 
-    // ✅ VALIDAR PERMISOS
     if (getResult.Item.userId !== userId && userId !== 'admin') {
       return res.status(403).json({
         success: false,
@@ -489,14 +528,11 @@ exports.deleteItinerary = async (req, res) => {
       });
     }
 
-    // ✅ SOFT DELETE: Actualizar status en lugar de borrar
     await docClient.send(new UpdateCommand({
       TableName: process.env.DYNAMODB_TABLE_TRIPS,
       Key: { tripId },
       UpdateExpression: 'SET #status = :status, deletedAt = :deletedAt',
-      ExpressionAttributeNames: {
-        '#status': 'status'
-      },
+      ExpressionAttributeNames: { '#status': 'status' },
       ExpressionAttributeValues: {
         ':status': 'deleted',
         ':deletedAt': Date.now()
@@ -513,11 +549,389 @@ exports.deleteItinerary = async (req, res) => {
 
   } catch (error) {
     console.error('❌ deleteItinerary error:', error.message);
-    
     res.status(500).json({
       success: false,
       error: 'INTERNAL_SERVER_ERROR',
       message: 'Failed to delete itinerary'
+    });
+  }
+};
+
+/**
+ * ✅ REGENERAR ITINERARIO CON COMENTARIOS DEL USUARIO (RF-05.08)
+ * POST /api/itinerary/regenerate
+ * Body: { tripId, originalRequest?, userComments }
+ * 
+ * ✅ Simplificado: Permite tripId=null si originalRequest está presente
+ */
+exports.regenerateItinerary = async (req, res) => {
+  const requestId = `req_${uuidv4()}`;
+  const userId = req.user?.userId || 'anonymous';
+  const { tripId, originalRequest, userComments } = req.body;
+
+  console.log('=== 🔄 Regenerate Itinerary Request ===', {
+    requestId,
+    userId,
+    tripId,
+    hasOriginalRequest: !!originalRequest,
+    userComments: userComments?.substring(0, 100) + (userComments?.length > 100 ? '...' : '')
+  });
+
+  try {
+    // ✅ VALIDAR ENTRADA
+    if (!userComments || userComments.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        error: 'VALIDATION_ERROR',
+        message: 'User comments are required for regeneration',
+        requestId
+      });
+    }
+
+    // ✅ VALIDAR: Se requiere tripId O originalRequest (no ambos)
+    if (!tripId && !originalRequest) {
+      return res.status(400).json({
+        success: false,
+        error: 'VALIDATION_ERROR',
+        message: 'Either tripId or originalRequest is required',
+        requestId
+      });
+    }
+
+    let tripData, travelers, budget, preferences;
+    let originalTrip = null;
+    let regenerationCount = 0;
+
+    // ✅ CASO 1: Usar originalRequest si está disponible (itinerario no guardado aún)
+    if (originalRequest) {
+      console.log('🔄 [Regenerate] Using originalRequest from frontend');
+      tripData = originalRequest.tripData || {};
+      travelers = originalRequest.travelers || [];
+      budget = originalRequest.budget || {};
+      preferences = originalRequest.preferences || {};
+      
+      // ✅ Cuando usamos originalRequest, no hay historial en DB → permitir regeneración
+      // El límite de 2 regeneraciones aplica solo a itinerarios guardados
+      regenerationCount = 0;
+    }
+    // ✅ CASO 2: Fallback - buscar en DynamoDB si hay tripId pero no originalRequest
+    else if (tripId) {
+      console.log('🔄 [Regenerate] Fallback: fetching from DynamoDB');
+      const { GetCommand } = require('@aws-sdk/lib-dynamodb');
+      
+      const getResult = await docClient.send(new GetCommand({
+        TableName: process.env.DYNAMODB_TABLE_TRIPS,
+        Key: { tripId }
+      }));
+
+      if (!getResult.Item) {
+        return res.status(404).json({
+          success: false,
+          error: 'NOT_FOUND',
+          message: 'Itinerary not found',
+          requestId
+        });
+      }
+
+      if (getResult.Item.userId !== userId && userId !== 'admin') {
+        return res.status(403).json({
+          success: false,
+          error: 'FORBIDDEN',
+          message: 'You do not have permission to regenerate this itinerary',
+          requestId
+        });
+      }
+
+      // ✅ EXTRAER DATOS ORIGINALES del viaje guardado
+      originalTrip = getResult.Item;
+      tripData = originalTrip.tripData || {};
+      travelers = originalTrip.travelers || [];
+      budget = originalTrip.budget || {};
+      preferences = originalTrip.preferences || {};
+      
+      // ✅ Obtener contador de regeneraciones desde metadata (solo si está guardado)
+      const metadata = originalTrip.metadata || {};
+      regenerationCount = metadata.regenerationCount || 0;
+      
+      // ✅ RF-05.08.01-03: Validar límite de regeneraciones (solo para itinerarios guardados)
+      if (regenerationCount >= 2) {
+        console.warn('⚠️ [Regenerate] Regeneration limit reached', {
+          requestId,
+          tripId,
+          regenerationCount
+        });
+        
+        return res.status(400).json({
+          success: false,
+          error: 'REGENERATION_LIMIT',
+          message: 'Regeneration limit reached',
+          requestId
+        });
+      }
+    }
+
+    // ✅ VALIDAR DATOS REQUERIDOS
+    if (!tripData?.destination || !tripData?.startDate || !tripData?.endDate) {
+      return res.status(400).json({
+        success: false,
+        error: 'INVALID_DATA',
+        message: 'Missing required trip data for regeneration',
+        requestId
+      });
+    }
+
+    // ✅ RECICLAR customNotes para agregar comentarios de regeneración con formato de auditoría
+    const regenerationNotes = userComments.trim();
+    const originalCustomNotes = preferences?.customNotes || '';
+    
+    // ✅ Agregar comentarios con formato: [REGENERATION N - timestamp]: comentarios
+    preferences.customNotes = `${originalCustomNotes}
+[REGENERATION ${regenerationCount + 1} - ${new Date().toISOString()}]: ${regenerationNotes}`.trim();
+    
+    console.log('🔄 [Regenerate] Updated customNotes with regeneration comment', {
+      regenerationCount: regenerationCount + 1,
+      customNotes: preferences.customNotes.substring(0, 200) + '...'
+    });
+
+    // ✅ LLAMAR A GCP PARA REGENERAR CON PROMPT ESPECIAL + customNotes actualizado
+    const startTime = Date.now();
+    
+    const result = await gcpService.regenerateItineraryWithFeedback(
+      tripData,
+      travelers,
+      budget,
+      preferences,
+      regenerationNotes,
+      tripId  // ← Puede ser null si no está guardado
+    );
+
+    const durationMs = Date.now() - startTime;
+    console.log('✅ [Regenerate] GCP regeneration completed', {
+      requestId,
+      duration: `${durationMs}ms`,
+      success: result.success
+    });
+
+    if (!result.success) {
+      return res.status(500).json({
+        success: false,
+        error: 'REGENERATION_ERROR',
+        message: result.message || 'Failed to regenerate itinerary',
+        requestId
+      });
+    }
+
+    const itineraryData = result.data;
+
+    // ✅ VALIDAR estructura mínima del itinerario regenerado
+    if (!itineraryData?.summary || !Array.isArray(itineraryData?.dailyPlan)) {
+      console.error('❌ [Regenerate] Invalid itinerary structure:', {
+        hasSummary: !!itineraryData?.summary,
+        hasDailyPlan: Array.isArray(itineraryData?.dailyPlan),
+        keys: itineraryData ? Object.keys(itineraryData) : []
+      });
+      return res.status(500).json({
+        success: false,
+        error: 'INVALID_ITINERARY_STRUCTURE',
+        message: 'Regenerated itinerary has invalid structure',
+        requestId
+      });
+    }
+
+    // ✅ VALIDACIÓN DE PRESUPUESTO para itinerario regenerado
+    const userBudget = budget?.total || 0;
+    const estimatedTotal = calculateEstimatedTotal(
+      itineraryData, 
+      itineraryData.flights, 
+      itineraryData.selectedHotel
+    );
+    const currency = budget?.currency || 'USD';
+
+    if (userBudget > 0 && estimatedTotal > userBudget) {
+      console.warn('⚠️ [BudgetValidation - Regenerate] Itinerary exceeds user budget', {
+        requestId,
+        userBudget,
+        estimatedTotal,
+        difference: estimatedTotal - userBudget
+      });
+      
+      return res.status(400).json({
+        success: false,
+        error: 'BUDGET_EXCEEDED',
+        message: 'Sorry, I cannot create an itinerary with this budget. Please increase it.',
+        requestId,
+        data: {
+          userBudget,
+          estimatedTotal,
+          currency,
+          difference: estimatedTotal - userBudget
+        }
+      });
+    }
+
+    // ✅ Guardar itinerario regenerado en DynamoDB con NUEVO tripId
+    const newTripId = `trip_${uuidv4()}`;
+    const timestamp = Date.now();
+    const ttl = Math.floor((timestamp + 30 * 24 * 60 * 60 * 1000) / 1000);
+
+    const budgetBreakdown = itineraryData.budgetBreakdown || {};
+    const spentWithoutContingency = 
+      (budgetBreakdown.flights || 0) +
+      (budgetBreakdown.hotels || 0) +
+      (budgetBreakdown.food || 0) +
+      (budgetBreakdown.activities || 0) +
+      (budgetBreakdown.transport || 0);
+
+    const dbItem = {
+      tripId: newTripId,
+      userId,
+      timestamp,
+      ttl,
+      status: 'completed',
+      spent: spentWithoutContingency,
+      
+      // Datos originales del request
+      tripData,
+      travelers,
+      budget,
+      preferences,  // ✅ Incluye customNotes actualizado
+      
+      // Itinerario regenerado por Gemini
+      itinerary: {
+        summary: itineraryData.summary,
+        dailyPlan: itineraryData.dailyPlan,
+        budgetBreakdown: itineraryData.budgetBreakdown,
+        packingList: itineraryData.packingList,
+        travelTips: itineraryData.travelTips,
+        emergencyContacts: itineraryData.emergencyContacts
+      },
+      
+      // Datos enriquecidos para frontend
+      enrichedData: {
+        selectedHotel: itineraryData.selectedHotel,
+        selectedRestaurants: itineraryData.selectedRestaurants,
+        selectedAttractions: itineraryData.selectedAttractions,
+        weather: itineraryData.weather,
+        transport: itineraryData.transport,
+        flights: itineraryData.flights
+      },
+      
+      // Metadatos para regeneración
+      metadata: {
+        generatedAt: new Date().toISOString(),
+        regeneratedFrom: tripId,  // ← Referencia al itinerario original (puede ser null)
+        regenerationCount: regenerationCount + 1,  // ✅ Incrementar contador
+        regenerationComments: regenerationNotes,
+        generationDuration: `${durationMs}ms`,
+        model: 'gemini-2.5-flash',
+        version: '1.0.0'
+      }
+    };
+
+    console.log('💾 [Regenerate] Saving regenerated itinerary to DynamoDB...', { 
+      requestId, 
+      newTripId, 
+      userId,
+      regenerationCount: regenerationCount + 1
+    });
+    
+    await docClient.send(new PutCommand({
+      TableName: process.env.DYNAMODB_TABLE_TRIPS,
+      Item: dbItem
+    }));
+
+    console.log('✅ [Regenerate] Regenerated itinerary saved to DynamoDB', { 
+      requestId, 
+      newTripId,
+      regeneratedFrom: tripId,
+      regenerationCount: regenerationCount + 1
+    });
+
+    // ✅ PREPARAR RESPUESTA PARA FRONTEND
+    const responseData = {
+      tripId: newTripId,
+      regeneratedFrom: tripId,
+      generatedAt: new Date().toISOString(),
+      summary: itineraryData.summary,
+      dailyPlan: itineraryData.dailyPlan,
+      budgetBreakdown: itineraryData.budgetBreakdown,
+      packingList: itineraryData.packingList,
+      travelTips: itineraryData.travelTips,
+      emergencyContacts: itineraryData.emergencyContacts,
+      places: {
+        hotel: itineraryData.selectedHotel,
+        restaurants: itineraryData.selectedRestaurants?.slice(0, 10) || [],
+        attractions: itineraryData.selectedAttractions?.slice(0, 15) || []
+      },
+      coordinates: {
+        hotel: itineraryData.selectedHotel?.gps || null,
+        restaurants: itineraryData.selectedRestaurants?.map(r => ({ name: r.name, gps: r.gps })) || [],
+        attractions: itineraryData.selectedAttractions?.map(a => ({ name: a.name, gps: a.gps })) || []
+      },
+      travel: {
+        flight: itineraryData.flights?.optimalFlight,
+        transport: itineraryData.transport
+      },
+      weather: itineraryData.weather,
+      recommendations: itineraryData.recommendations
+    };
+	
+	console.log('🔍 [Regenerate] Response data structure:', {
+      tripId: newTripId,
+      hasSummary: !!itineraryData.summary,
+      hasDailyPlan: Array.isArray(itineraryData.dailyPlan),
+      hasBudgetBreakdown: !!itineraryData.budgetBreakdown,
+      hasSelectedFlights: !!itineraryData.flights?.optimalFlight,
+      hasSelectedHotel: !!itineraryData.selectedHotel,
+      summary: itineraryData.summary,
+      budgetBreakdown: itineraryData.budgetBreakdown,
+      flightsOptimal: itineraryData.flights?.optimalFlight?.price?.amount,
+      flightsReturn: itineraryData.flights?.returnFlight?.price?.amount,
+      hotelTotal: itineraryData.selectedHotel?.totalPrice?.amount
+    });
+
+    // ✅ RETORNAR RESPUESTA EXITOSA
+    res.status(200).json({
+      success: true,
+      message: 'Itinerary regenerated successfully',
+      requestId,
+      data: responseData
+	  
+    });
+
+  } catch (error) {
+    console.error('❌ regenerateItinerary error:', {
+      requestId,
+      error: error.message,
+      code: error.code,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+
+    if (error.message?.includes('UNAUTHORIZED')) {
+      return res.status(401).json({
+        success: false,
+        error: 'GCP_AUTH_ERROR',
+        message: 'Failed to authenticate with GCP services',
+        requestId
+      });
+    }
+
+    if (error.message?.includes('TIMEOUT') || error.code === 'ECONNABORTED') {
+      return res.status(504).json({
+        success: false,
+        error: 'TIMEOUT',
+        message: 'Regeneration request timed out. Please try again.',
+        requestId,
+        retryAfter: 30
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      error: 'INTERNAL_SERVER_ERROR',
+      message: 'Failed to regenerate itinerary',
+      requestId,
+      debug: process.env.NODE_ENV === 'development' ? { error: error.message } : undefined
     });
   }
 };
