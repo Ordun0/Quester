@@ -781,7 +781,7 @@ exports.regenerateWithFeedback = async (req, res) => {
       message: error.message,
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
-
+    
     res.status(500).json({
       success: false,
       error: 'INTERNAL_SERVER_ERROR',
