@@ -41,10 +41,11 @@ function Itinerary() {
     }
   }, []);  // ✅ useCallback para estabilidad de referencia
 
-  // ✅ useEffect para detectar regeneración vía location.state (fallback)
+  // ✅ useEffect para detectar regeneración vía query param (cuando window.location.href cambia la URL)
   useEffect(() => {
-    if (location.state?.__key || location.state?.regenerated) {
-      console.log('🔄 [Itinerary] Detected regeneration via state, syncing...');
+    const params = new URLSearchParams(location.search);
+    if (params.get('regenerated')) {
+      console.log('🔄 [Itinerary] Detected regeneration via query param, syncing from sessionStorage...');
       
       const stored = sessionStorage.getItem('itineraryData');
       if (stored) {
@@ -63,18 +64,19 @@ function Itinerary() {
           
           if (data?.itinerary?.dailyPlan && Array.isArray(data.itinerary.dailyPlan)) {
             setItineraryData(data);
+            console.log('✅ [Itinerary] State updated with regenerated itinerary');
           }
         } catch (e) {
           console.error('❌ Error parsing itinerary:', e);
         }
       }
       
-      // ✅ Limpiar state para evitar re-uso
-      window.history.replaceState({}, document.title);
+      // ✅ Limpiar query param para evitar re-uso
+      window.history.replaceState({}, document.title, location.pathname);
     }
-  }, [location.state?.__key, location.state?.regenerated]);
+  }, [location.search]);
 
-  // ✅ useEffect principal: Carga inicial desde sessionStorage
+  // ✅ useEffect principal: Carga inicial desde sessionStorage (se ejecuta al montar y cuando cambia location.search para regeneración)
   useEffect(() => {
     const loadItinerary = () => {
       const stored = sessionStorage.getItem('itineraryData');
@@ -142,7 +144,7 @@ function Itinerary() {
     };
 
     loadItinerary();
-  }, [navigate]);
+  }, [navigate, location.search]);  // ✅ Añadido location.search para recargar tras regeneración
 
   // ✅ Función para verificar límite de viajes guardados (RF-06.02)
   const checkTripLimit = async (token) => {

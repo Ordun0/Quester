@@ -13,7 +13,8 @@ function ItineraryView({
   isExporting, 
   saveStatus,
   actionType = 'save',  // ✅ NUEVO: 'save' | 'delete', default 'save'
-  allowRegeneration = true  // ✅ NUEVO: Controla visibilidad del botón Regenerate (default: true)
+  allowRegeneration = true,  // ✅ NUEVO: Controla visibilidad del botón Regenerate (default: true)
+  onItineraryUpdated  // ✅ NUEVO: Callback para actualizar itinerario directamente tras regeneración
 }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -279,7 +280,7 @@ function ItineraryView({
         userComments: requestBody.userComments?.substring(0, 100)
       });
       
-      // ✅ Endpoint NORMAL /api/extraction (reutilizamos el que ya funciona)
+      // ✅ Endpoint /api/extraction (standard extraction endpoint with regeneration flags)
       const response = await fetch(`${API_BASE_URL}/api/extraction`, {
         method: 'POST',
         headers: {
@@ -315,26 +316,28 @@ function ItineraryView({
         setShowRegenerateModal(false);
         setRegenerateComments('');
         
-        if (result.data?.tripId) {
-          console.log('🔄 [Regenerate] Saving regenerated itinerary to sessionStorage');
-          
-          // ✅ Normalizar estructura para asegurar compatibilidad con Itinerary.jsx
-          const dataToSave = {
-            extraction: result.data.extraction || result.data,
-            itinerary: result.data.itinerary || result.data
-          };
-          
-          // ✅ Guardar en sessionStorage (síncrono)
-          sessionStorage.setItem('itineraryData', JSON.stringify(dataToSave));
-          
-          // ✅ Forzar recarga REAL del navegador con query param único
-          // Esto evita que React Router intercepte y asegura carga fresca
-          setTimeout(() => {
-            window.location.href = '/itinerary?regenerated=' + Date.now();
-          }, 150);  // Pequeño delay para asegurar que sessionStorage se guarde
-        } else {
-          window.location.reload();
+        console.log('🔄 [Regenerate] Saving regenerated itinerary to sessionStorage');
+        
+        // ✅ Normalizar estructura para asegurar compatibilidad con Itinerary.jsx
+        const dataToSave = {
+          extraction: result.data?.extraction || result.data,
+          itinerary: result.data?.itinerary || result.data
+        };
+        
+        // ✅ Guardar en sessionStorage (síncrono)
+        sessionStorage.setItem('itineraryData', JSON.stringify(dataToSave));
+        
+        // ✅ Llamar callback para actualizar estado directamente en Itinerary.jsx
+        if (onItineraryUpdated) {
+          onItineraryUpdated(dataToSave);
         }
+        
+        // ✅ Forzar recarga REAL del navegador con query param único
+        // Esto evita que React Router intercepte y asegura carga fresca
+        setTimeout(() => {
+          window.location.href = '/itinerary?regenerated=' + Date.now();
+        }, 150);  // Pequeño delay para asegurar que sessionStorage se guarde
+        
       } else {
         throw new Error(result.message || 'Failed to regenerate itinerary');
       }

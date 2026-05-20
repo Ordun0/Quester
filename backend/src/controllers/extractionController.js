@@ -431,6 +431,7 @@ exports.extractAndGenerate = async (req, res) => {
       success: true,
       message: isRegeneration ? 'Itinerary regenerated successfully' : 'Itinerary generated successfully',
       data: {
+        tripId: originalTripId || null,  // ✅ Incluir tripId para que el frontend sepa que es regeneración
         extraction: {
           summary: extractionResult.data.summary,
           duration: extractionResult.duration
