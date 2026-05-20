@@ -1,5 +1,3 @@
-// frontend/src/pages/SavedItinerary.jsx
-
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import tripsService from '../services/trips.service';
@@ -360,7 +358,9 @@ function SavedItinerary() {
         isSaving={isDeleting}
         isExporting={false}
         saveStatus={deleteStatus === 'success' ? 'success' : deleteStatus === 'error' ? 'error' : null}
-		actionType="delete"
+        actionType="delete"
+        // ✅ NUEVO: Deshabilitar botón de regenerar para itinerarios guardados (RF-06.03 + RF-05.08)
+        allowRegeneration={false}
       />
     </>
   );

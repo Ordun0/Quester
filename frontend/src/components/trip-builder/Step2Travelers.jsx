@@ -4,15 +4,16 @@ import React, { useState, useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { travelersSchema } from '../../utils/validators';
-import authService from '../../services/auth.service';  // ✅ IMPORTANTE: Importar authService
+import authService from '../../services/auth.service';
 
 function Step2Travelers({ tripData, updateTripData, onValid, onNext, onBack }) {
   const [budgetError, setBudgetError] = useState('');
   const [percentageError, setPercentageError] = useState('');
+  const [interestError, setInterestError] = useState('');  // ✅ NUEVO: Para mensaje inline de intereses
   const [totalPercentage, setTotalPercentage] = useState(100);
   const [isDistributionModified, setIsDistributionModified] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);  // ✅ Estado de carga
-  const [error, setError] = useState('');  // ✅ Estado de error
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
   // ✅ RF-04.03.02 - Distribución por defecto
   const DEFAULT_DISTRIBUTION = {
@@ -28,9 +29,10 @@ function Step2Travelers({ tripData, updateTripData, onValid, onNext, onBack }) {
     handleSubmit,
     formState: { errors },
     watch,
-    trigger,
+    trigger,  // ✅ Para validar todos los campos al enviar
     control,
-    setValue
+    setValue,
+    getValues
   } = useForm({
     resolver: zodResolver(travelersSchema),
     mode: 'onBlur',
@@ -55,31 +57,75 @@ function Step2Travelers({ tripData, updateTripData, onValid, onNext, onBack }) {
   const budgetDistribution = watch('budgetDistribution');
   const travelers = watch('travelers');
 
-  // ✅ RF-04.03.04 - Calcular suma de porcentajes
+  // ✅ NUEVO: Handler para budget - MISMO PATRÓN que updateDistribution (porcentajes)
+  const handleBudgetChange = (value) => {
+    const newValue = value === '' ? '' : parseFloat(value);
+    if (value === '' || (!isNaN(newValue) && newValue >= 0)) {
+      setValue('budget', newValue);
+    }
+  };
+
+  // ✅ Helper para convertir budget a número seguro (usar en validaciones)
+  const getBudgetNum = () => {
+    const val = budget;
+    if (val === '' || val === null || val === undefined) return 0;
+    const num = typeof val === 'string' ? parseFloat(val) : val;
+    return isNaN(num) ? 0 : num;
+  };
+
+  // ✅ FIX BUG 2: Helper para calcular suma de porcentajes (siempre como números)
+  const calculateTotalPercentage = (distribution) => {
+    return Object.values(distribution || {}).reduce((acc, val) => {
+      const num = typeof val === 'string' ? parseInt(val, 10) : val;
+      return acc + (isNaN(num) ? 0 : num);
+    }, 0);
+  };
+
+  // ✅ RF-04.03.04 - Calcular suma de porcentajes (ACTUALIZADO)
   useEffect(() => {
-    const sum = Object.values(budgetDistribution || {}).reduce((acc, val) => acc + (parseInt(val) || 0), 0);
+    const sum = calculateTotalPercentage(budgetDistribution);
     setTotalPercentage(sum);
     
-    if (isDistributionModified && sum !== 100) {
-      setPercentageError(`Total must be 100% (currently ${sum}%)`);
+    if (isDistributionModified) {
+      if (sum !== 100) {
+        setPercentageError(`Total must be 100% (currently ${sum}%)`);
+      } else {
+        setPercentageError('');
+      }
     } else {
       setPercentageError('');
     }
   }, [budgetDistribution, isDistributionModified]);
 
-  // ✅ RF-04.02 - Validar presupuesto mínimo
+  // ✅ RF-04.02 - Validar presupuesto mínimo (usando getBudgetNum)
   useEffect(() => {
-    if (budget && budget < 500) {
+    const budgetNum = getBudgetNum();
+    
+    if (budgetNum && budgetNum < 500) {
       setBudgetError(`Minimum budget is 500 ${currency}`);
     } else {
       setBudgetError('');
     }
   }, [budget, currency]);
 
-  // Validar para habilitar botón
+  // ✅ NUEVO: Limpiar errores cuando el usuario corrija los campos (RF-06.04.02-03)
   useEffect(() => {
+    if (budget && getBudgetNum() >= 500 && budgetError) {
+      setBudgetError('');
+    }
+    if (budgetDistribution && calculateTotalPercentage(budgetDistribution) === 100 && percentageError) {
+      setPercentageError('');
+    }
+    if (interestError) {
+      setInterestError('');
+    }
+  }, [budget, budgetDistribution, travelers, interestError]);
+
+  // Validar para habilitar botón (usando getBudgetNum)
+  useEffect(() => {
+    const budgetNum = getBudgetNum();
     const hasTravelers = fields.length > 0 && travelers?.every(t => t.name && t.name.trim() !== '');
-    const hasValidBudget = budget >= 500;
+    const hasValidBudget = budgetNum >= 500;
     const hasValidPercentage = !isDistributionModified || totalPercentage === 100;
 
     if (hasTravelers && hasValidBudget && hasValidPercentage) {
@@ -96,7 +142,7 @@ function Step2Travelers({ tripData, updateTripData, onValid, onNext, onBack }) {
     }
   };
 
-  // ✅ RF-03.01 - Intereses por viajero (máx 4 por viajero)
+  // ✅ RF-03.01 - Intereses por viajero (máx 4 por viajero) - CON FIX DE MENSAJE INLINE
   const toggleTravelerInterest = (travelerIndex, interestId) => {
     const currentTraveler = travelers[travelerIndex];
     const currentInterests = currentTraveler?.interests || [];
@@ -104,53 +150,98 @@ function Step2Travelers({ tripData, updateTripData, onValid, onNext, onBack }) {
     
     let newInterests;
     if (index > -1) {
-      // Remover interés
       newInterests = currentInterests.filter((_, i) => i !== index);
     } else {
-      // Agregar interés (máx 4)
       if (currentInterests.length >= 4) {
-        alert('Maximum 4 interests allowed per traveler');
+        // ✅ RF-03.01.04: Mostrar mensaje inline en lugar de alert nativo
+        setInterestError('Maximum 4 interests allowed per traveler');
+        setTimeout(() => setInterestError(''), 3000);
         return;
       }
       newInterests = [...currentInterests, interestId];
     }
     
-    // Actualizar el viajero en el form
     setValue(`travelers.${travelerIndex}.interests`, newInterests);
   };
 
-  // ✅ RF-04.03 - Actualizar distribución de presupuesto
+  // ✅ RF-04.03 - Actualizar distribución de presupuesto (FIX BUG 2: nunca bloquear inputs)
   const updateDistribution = (category, value) => {
-    const newValue = parseInt(value) || 0;
+    const newValue = value === '' ? 0 : parseInt(value, 10);
     
-    // Validar que no sea negativo
-    if (newValue < 0) return;
+    if (isNaN(newValue) || newValue < 0) return;
+    if (newValue > 100) return;
     
     const updated = {
       ...budgetDistribution,
       [category]: newValue
     };
     
-    // Marcar como modificado por el usuario
+    // ✅ RF-04.03.04.01: Deshabilitar visualmente si suma > 100% (mantener lógica existente)
+    const currentSum = calculateTotalPercentage(budgetDistribution);
+    const currentVal = typeof budgetDistribution?.[category] === 'string' 
+      ? parseInt(budgetDistribution[category], 10) 
+      : budgetDistribution?.[category] || 0;
+    const diff = newValue - currentVal;
+    
+    if (currentSum + diff > 100) {
+      // No permitir que la suma exceda 100%
+      return;
+    }
+    
     setIsDistributionModified(true);
-    
-    // Actualizar el valor en el form
     setValue('budgetDistribution', updated);
+    
+    const newSum = calculateTotalPercentage(updated);
+    if (newSum === 100) {
+      setPercentageError('');
+    }
   };
 
-  // ✅ RF-04.03.04.01 - Deshabilitar incremento si suma > 100%
-  const isInputDisabled = (category, currentValue) => {
-    if (!isDistributionModified) return false;
+  // ✅ FIX BUG 2: NUEVO - Auto-balance para redistribuir porcentajes a 100%
+  const autoBalanceDistribution = () => {
+    const current = { ...budgetDistribution };
+    const currentSum = calculateTotalPercentage(current);
     
-    const currentSum = Object.values(budgetDistribution || {}).reduce((acc, val, key) => {
-      if (key === category) return acc + currentValue;
-      return acc + (parseInt(val) || 0);
-    }, 0);
+    if (currentSum === 100) return;
     
-    return currentSum > 100;
+    const diff = 100 - currentSum;
+    
+    if (diff < 0) {
+      const nonZeroCategories = Object.entries(current).filter(([_, val]) => {
+        const num = typeof val === 'string' ? parseInt(val, 10) : val;
+        return num > 0;
+      });
+      
+      if (nonZeroCategories.length === 0) return;
+      
+      const totalNonZero = nonZeroCategories.reduce((acc, [_, val]) => {
+        const num = typeof val === 'string' ? parseInt(val, 10) : val;
+        return acc + num;
+      }, 0);
+      
+      nonZeroCategories.forEach(([key, val]) => {
+        const num = typeof val === 'string' ? parseInt(val, 10) : val;
+        const reduction = Math.round((num / totalNonZero) * Math.abs(diff));
+        current[key] = Math.max(0, num - reduction);
+      });
+      
+      const finalSum = calculateTotalPercentage(current);
+      if (finalSum !== 100) {
+        const largest = Object.entries(current).reduce((a, b) => 
+          ((typeof a[1] === 'string' ? parseInt(a[1], 10) : a[1]) > (typeof b[1] === 'string' ? parseInt(b[1], 10) : b[1])) ? a : b
+        );
+        current[largest[0]] += (100 - finalSum);
+      }
+    } else {
+      current.activities = (typeof current.activities === 'string' ? parseInt(current.activities, 10) : current.activities) + diff;
+    }
+    
+    setValue('budgetDistribution', current);
+    setIsDistributionModified(true);
+    setPercentageError('');
   };
 
-  // ✅ Submit del paso 2 - CONECTADO CON BACKEND
+  // ✅ Submit del paso 2 - CON FIXES DE FRONTEND
   const onSubmit = async (data) => {
     console.log('=== SUBMIT STEP 2 ===');
     console.log('Data from form:', data);
@@ -158,8 +249,18 @@ function Step2Travelers({ tripData, updateTripData, onValid, onNext, onBack }) {
     console.log('SessionId:', tripData.step1?.sessionId);
     console.log('=====================');
 
-    // Validaciones finales
-    if (data.budget < 500) {
+    // ✅ RF-07.01.02: Validar TODOS los campos al intentar enviar y mostrar errores simultáneamente
+    const isValid = await trigger();
+    
+    if (!isValid) {
+      console.log('❌ Validation failed, showing all errors');
+      return;
+    }
+
+    // Validaciones finales (usando getBudgetNum)
+    const budgetNum = getBudgetNum();
+    
+    if (budgetNum < 500) {
       setBudgetError(`Minimum budget is 500 ${currency}`);
       return;
     }
@@ -176,7 +277,6 @@ function Step2Travelers({ tripData, updateTripData, onValid, onNext, onBack }) {
       const token = sessionStorage.getItem('token');
       const sessionId = tripData.step1?.sessionId;
 
-      // ✅ DEBUG: Verificar sessionId
       if (!sessionId) {
         console.error('❌ ERROR: sessionId is undefined!');
         console.error('tripData:', tripData);
@@ -188,7 +288,7 @@ function Step2Travelers({ tripData, updateTripData, onValid, onNext, onBack }) {
       const payload = {
         sessionId: sessionId,
         travelers: data.travelers,
-        budget: Number(data.budget),
+        budget: getBudgetNum(),
         currency: data.currency,
         budgetDistribution: isDistributionModified ? data.budgetDistribution : DEFAULT_DISTRIBUTION
       };
@@ -196,12 +296,10 @@ function Step2Travelers({ tripData, updateTripData, onValid, onNext, onBack }) {
       console.log('📤 Sending to backend:', payload);
       console.log('Token exists:', !!token);
 
-      // ✅ Tarea 68: Conectar con backend
       const response = await authService.saveTripStep2(token, payload);
 
       console.log('✅ Backend response:', response);
 
-      // Actualizar estado local con respuesta del backend
       updateTripData('step2', {
         ...response.data,
         sessionId: response.data.sessionId
@@ -374,6 +472,12 @@ function Step2Travelers({ tripData, updateTripData, onValid, onNext, onBack }) {
               {errors.travelers?.[index]?.interests && (
                 <p className="text-xs text-red-600">{errors.travelers[index].interests.message}</p>
               )}
+              {/* ✅ RF-03.01.04: Mensaje inline para límite de intereses */}
+              {interestError && (
+                <p className="mt-2 text-xs text-orange-600 bg-orange-50 px-3 py-2 rounded-lg">
+                  {interestError}
+                </p>
+              )}
             </div>
           </div>
         ))}
@@ -425,7 +529,8 @@ function Step2Travelers({ tripData, updateTripData, onValid, onNext, onBack }) {
               </span>
               <input
                 type="number"
-                {...register('budget')}
+                value={budget ?? 1000}
+                onChange={(e) => handleBudgetChange(e.target.value)}
                 min="500"
                 className={`w-full pl-10 pr-4 py-3 rounded-lg border transition-colors focus:outline-none focus:ring-2 focus:ring-quester-blue ${
                   budgetError || errors.budget
@@ -460,12 +565,27 @@ function Step2Travelers({ tripData, updateTripData, onValid, onNext, onBack }) {
             }`}>
               Total: {totalPercentage}%
             </span>
+            {isDistributionModified && totalPercentage !== 100 && (
+              <button
+                type="button"
+                onClick={autoBalanceDistribution}
+                className="text-xs px-2 py-1 bg-quester-blue text-white rounded hover:bg-blue-600 transition-colors"
+                title="Automatically balance to 100%"
+              >
+                Auto-balance
+              </button>
+            )}
           </div>
         </div>
 
         {percentageError && (
           <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
             <p className="text-sm text-red-700">{percentageError}</p>
+            {totalPercentage > 100 && (
+              <p className="text-xs mt-1 text-gray-600">
+                💡 Tip: Reduce one category or click "Auto-balance" to fix
+              </p>
+            )}
           </div>
         )}
 
@@ -476,19 +596,19 @@ function Step2Travelers({ tripData, updateTripData, onValid, onNext, onBack }) {
                 <label className="text-sm font-medium text-quester-dark">{category.label}</label>
                 <input
                   type="number"
-                  value={budgetDistribution?.[category.id] || 0}
+                  value={budgetDistribution?.[category.id] ?? 0}
                   onChange={(e) => updateDistribution(category.id, e.target.value)}
                   min="0"
                   max="100"
-                  disabled={isInputDisabled(category.id, budgetDistribution?.[category.id] || 0)} 
-                  className="w-20 px-3 py-2 text-right rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-quester-blue disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  // ✅ RF-04.03.04.01: Input siempre habilitado para permitir corrección
+                  className="w-20 px-3 py-2 text-right rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-quester-blue"
                   style={{ backgroundColor: 'rgba(211, 225, 255, 0.15)' }}
                 />
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2">
                 <div
                   className={`h-2 rounded-full transition-all ${category.color}`}
-                  style={{ width: `${budgetDistribution?.[category.id] || 0}%` }}
+                  style={{ width: `${Math.min(budgetDistribution?.[category.id] || 0, 100)}%` }}
                 ></div>
               </div>
             </div>
@@ -497,21 +617,32 @@ function Step2Travelers({ tripData, updateTripData, onValid, onNext, onBack }) {
 
         {/* Botón para resetear a defaults */}
         {isDistributionModified && (
-          <button
-            type="button"
-            onClick={() => {
-              setValue('budgetDistribution', DEFAULT_DISTRIBUTION);
-              setIsDistributionModified(false);
-              setPercentageError('');
-            }}
-            className="text-sm text-quester-blue hover:text-blue-700 font-medium transition-colors"
-          >
-            Reset to default distribution
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setValue('budgetDistribution', DEFAULT_DISTRIBUTION);
+                setIsDistributionModified(false);
+                setPercentageError('');
+              }}
+              className="text-sm text-quester-blue hover:text-blue-700 font-medium transition-colors"
+            >
+              Reset to default distribution
+            </button>
+            {totalPercentage !== 100 && (
+              <button
+                type="button"
+                onClick={autoBalanceDistribution}
+                className="text-sm text-quester-blue hover:text-blue-700 font-medium transition-colors"
+              >
+                Auto-balance to 100%
+              </button>
+            )}
+          </div>
         )}
       </div>
 
-      {/* Navigation Buttons */}
+      {/* ✅ Navigation Buttons - RF-07.02.01: Siempre habilitado (solo estilo visual) */}
       <div className="flex justify-between pt-6 border-t border-gray-200">
         <button
           type="button"
@@ -522,22 +653,10 @@ function Step2Travelers({ tripData, updateTripData, onValid, onNext, onBack }) {
         </button>
         <button
           type="submit"
-          disabled={
-            isLoading ||
-            fields.length === 0 ||
-            travelers?.some(t => !t.name || t.name.trim() === '') ||
-            !budget ||
-            budget < 500 ||
-            (isDistributionModified && totalPercentage !== 100)
-          }
+          // ✅ RF-07.02.01: Botón siempre habilitado, validaciones al enviar
           className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium text-base transition-all ${
-            isLoading ||
-            fields.length === 0 ||
-            travelers?.some(t => !t.name || t.name.trim() === '') ||
-            !budget ||
-            budget < 500 ||
-            (isDistributionModified && totalPercentage !== 100)
-              ? 'bg-gray-300 cursor-not-allowed text-gray-500'
+            isLoading || fields.length === 0 || travelers?.some(t => !t.name || t.name.trim() === '') || getBudgetNum() < 500 || (isDistributionModified && totalPercentage !== 100)
+              ? 'bg-gray-300 cursor-not-allowed text-gray-500'  // Solo estilo visual
               : 'bg-quester-blue hover:bg-blue-600 text-white shadow-md hover:shadow-lg'
           }`}
         >

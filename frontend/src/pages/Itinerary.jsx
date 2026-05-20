@@ -1,36 +1,164 @@
 // frontend/src/pages/Itinerary.jsx
 
-import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useState, useCallback } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import ItineraryView from '../components/trip-builder/ItineraryView';
 import tripsService from '../services/trips.service';
 
 function Itinerary() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [itineraryData, setItineraryData] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [saveStatus, setSaveStatus] = useState(null);  // 'success' | 'error' | null
+  const [saveStatus, setSaveStatus] = useState(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);  // ✅ Feedback visual para regeneración
 
-  useEffect(() => {
-    // ✅ Recuperar datos del itinerario desde sessionStorage
-    const storedData = sessionStorage.getItem('itineraryData');
+  // ✅ CALLBACK para actualizar itinerario directamente (sin navegar)
+  // Se llama desde ItineraryView.jsx después de regeneración exitosa
+  const handleItineraryUpdated = useCallback((newData) => {
+    console.log('🔄 [Itinerary] Direct update received, updating state');
     
-    if (!storedData) {
-      navigate('/trip-builder');
-      return;
+    // ✅ Validar estructura antes de actualizar
+    if (newData?.itinerary?.dailyPlan && Array.isArray(newData.itinerary.dailyPlan)) {
+      // ✅ Actualizar sessionStorage como backup
+      sessionStorage.setItem('itineraryData', JSON.stringify(newData));
+      
+      // ✅ Actualizar estado local → re-render automático de ItineraryView
+      setItineraryData(newData);
+      
+      // ✅ Feedback visual opcional
+      console.log('✅ [Itinerary] State updated directly with new itinerary');
+      
+      // ✅ Resetear estado de regeneración
+      setIsRegenerating(false);
+      
+      return true;
+    } else {
+      console.error('❌ [Itinerary] Invalid data structure in update callback');
+      setIsRegenerating(false);
+      return false;
     }
+  }, []);  // ✅ useCallback para estabilidad de referencia
 
-    try {
-      const parsedData = JSON.parse(storedData);
-      // ✅ El backend retorna { success, message,  { extraction, itinerary } }
-      const data = parsedData.data || parsedData;
-      setItineraryData(data);
-    } catch (error) {
-      console.error('Error parsing itinerary ', error);
-      navigate('/trip-builder');
+  // ✅ useEffect para detectar regeneración vía location.state (fallback)
+  useEffect(() => {
+    if (location.state?.__key || location.state?.regenerated) {
+      console.log('🔄 [Itinerary] Detected regeneration via state, syncing...');
+      
+      const stored = sessionStorage.getItem('itineraryData');
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          let data;
+          if (parsed?.itinerary && parsed?.extraction) {
+            data = parsed;
+          } else if (parsed?.data?.itinerary) {
+            data = parsed.data;
+          } else if (parsed?.dailyPlan) {
+            data = { itinerary: parsed, extraction: {} };
+          } else {
+            throw new Error('Invalid itinerary structure');
+          }
+          
+          if (data?.itinerary?.dailyPlan && Array.isArray(data.itinerary.dailyPlan)) {
+            setItineraryData(data);
+          }
+        } catch (e) {
+          console.error('❌ Error parsing itinerary:', e);
+        }
+      }
+      
+      // ✅ Limpiar state para evitar re-uso
+      window.history.replaceState({}, document.title);
     }
+  }, [location.state?.__key, location.state?.regenerated]);
+
+  // ✅ useEffect principal: Carga inicial desde sessionStorage
+  useEffect(() => {
+    const loadItinerary = () => {
+      const stored = sessionStorage.getItem('itineraryData');
+      
+      if (!stored) {
+        navigate('/trip-builder');
+        return;
+      }
+
+      try {
+        const parsed = JSON.parse(stored);
+        let data;
+        if (parsed?.itinerary && parsed?.extraction) {
+          data = parsed;
+        } else if (parsed?.data?.itinerary) {
+          data = parsed.data;
+        } else if (parsed?.dailyPlan) {
+          data = { itinerary: parsed, extraction: {} };
+        } else {
+          throw new Error('Invalid itinerary structure');
+        }
+        
+        // ✅ Validar estructura mínima
+        if (!data?.itinerary?.dailyPlan || !Array.isArray(data.itinerary.dailyPlan)) {
+          sessionStorage.removeItem('itineraryData');
+          navigate('/trip-builder');
+          return;
+        }
+        
+        // ✅ Validar presupuesto (RF-04.05 + RF-08.02)
+        const summary = data.itinerary?.summary || data.summary;
+        const budgetBreakdown = data.itinerary?.budgetBreakdown || data.budgetBreakdown;
+        
+        if (summary?.totalBudget && budgetBreakdown?.total) {
+          const userBudget = summary.totalBudget;
+          const estimatedCost = budgetBreakdown.total;
+          
+          if (estimatedCost > userBudget) {
+            console.warn('⚠️ [BudgetError] Itinerary cost exceeds user budget', {
+              userBudget,
+              estimatedCost,
+              difference: estimatedCost - userBudget,
+              currency: summary.currency
+            });
+            
+            sessionStorage.removeItem('itineraryData');
+            navigate('/budget-error', {
+              state: {
+                budget: userBudget,
+                totalCost: estimatedCost,
+                currency: summary.currency || 'USD',
+                difference: estimatedCost - userBudget
+              }
+            });
+            return;
+          }
+        }
+        
+        setItineraryData(data);
+        
+      } catch (error) {
+        console.error('Error parsing itinerary:', error);
+        navigate('/trip-builder');
+      }
+    };
+
+    loadItinerary();
   }, [navigate]);
+
+  // ✅ Función para verificar límite de viajes guardados (RF-06.02)
+  const checkTripLimit = async (token) => {
+    try {
+      const result = await tripsService.getUserTrips(token);
+      
+      if (result.success && result.data?.trips) {
+        const activeTrips = result.data.trips.filter(trip => trip.status !== 'deleted');
+        return activeTrips.length;
+      }
+      return 0;
+    } catch (error) {
+      console.error('❌ Error checking trip limit:', error);
+      return 0;
+    }
+  };
 
   // ✅ Guardar itinerario en quester-trips (SOLO al presionar botón)
   const handleSaveTrip = async () => {
@@ -46,7 +174,16 @@ function Itinerary() {
         return;
       }
 
-      // ✅ Construir payload para guardar
+      // ✅ RF-06.02: Verificar límite de 6 viajes guardados
+      const tripCount = await checkTripLimit(token);
+      
+      if (tripCount >= 6) {
+        alert('Trip limit reached. Delete a trip to create a new one');
+        setSaveStatus('error');
+        setIsSaving(false);
+        return;
+      }
+
       const payload = {
         tripData: {
           origin: itineraryData.extraction?.summary?.origin || itineraryData.itinerary?.summary?.origin,
@@ -61,8 +198,8 @@ function Itinerary() {
           currency: itineraryData.itinerary?.summary?.currency
         },
         preferences: itineraryData.itinerary?.preferences || {},
-        itinerary: itineraryData.itinerary,  // ✅ Itinerario completo
-        sessionId: itineraryData.extraction?.extractionId  // Referencia a la sesión
+        itinerary: itineraryData.itinerary,
+        sessionId: itineraryData.extraction?.extractionId
       };
 
       const result = await tripsService.saveItinerary(token, payload);
@@ -70,11 +207,7 @@ function Itinerary() {
       if (result.success) {
         setSaveStatus('success');
         console.log('✅ Itinerary saved to quester-trips:', result.data.tripId);
-        
-        // ✅ Guardar tripId en sessionStorage para referencia futura
         sessionStorage.setItem('currentTripId', result.data.tripId);
-        
-        // ✅ Mostrar mensaje temporal
         setTimeout(() => setSaveStatus(null), 3000);
       } else {
         setSaveStatus('error');
@@ -94,11 +227,9 @@ function Itinerary() {
     setIsExporting(true);
     
     try {
-      // ✅ Importar librerías de PDF dinámicamente para no afectar el bundle inicial
       const { jsPDF } = await import('jspdf');
       const html2canvas = await import('html2canvas');
       
-      // ✅ Crear un elemento temporal para renderizar el PDF
       const element = document.createElement('div');
       element.style.padding = '20px';
       element.style.fontFamily = 'Arial, sans-serif';
@@ -110,7 +241,6 @@ function Itinerary() {
       const itinerary = itineraryData.itinerary;
       const summary = itinerary.summary;
       
-      // ✅ Construir contenido del PDF
       element.innerHTML = `
         <h1 style="font-size: 24px; color: #1e40af; margin-bottom: 8px; text-align: center;">
           ${summary?.title || 'Travel Itinerary'}
@@ -169,11 +299,10 @@ function Itinerary() {
         </p>
       `;
       
-      // ✅ Renderizar a canvas y luego a PDF
       document.body.appendChild(element);
       
       const canvas = await html2canvas.default(element, {
-        scale: 2,  // Mejor calidad
+        scale: 2,
         useCORS: true,
         backgroundColor: '#ffffff'
       });
@@ -187,11 +316,10 @@ function Itinerary() {
         format: 'a4'
       });
       
-      const imgWidth = 210;  // A4 width in mm
-      const pageHeight = 297;  // A4 height in mm
+      const imgWidth = 210;
+      const pageHeight = 297;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
       
-      // ✅ Manejar múltiples páginas si es necesario
       let heightLeft = imgHeight;
       let position = 0;
       
@@ -205,7 +333,6 @@ function Itinerary() {
         heightLeft -= pageHeight;
       }
       
-      // ✅ Descargar PDF
       const fileName = `Quester-${summary?.destination?.replace(/\s+/g, '-') || 'Itinerary'}-${summary?.travelDates?.start?.replace(/-/g, '') || 'trip'}.pdf`;
       pdf.save(fileName);
       
@@ -243,9 +370,12 @@ function Itinerary() {
       itineraryData={itineraryData}
       onSaveTrip={handleSaveTrip}
       onExportPDF={handleExportPDF}
+      onItineraryUpdated={handleItineraryUpdated}  // ✅ NUEVO: Callback para actualización directa
       isSaving={isSaving}
       isExporting={isExporting}
+      isRegenerating={isRegenerating}  // ✅ NUEVO: Estado para feedback visual
       saveStatus={saveStatus}
+      actionType="save"
     />
   );
 }

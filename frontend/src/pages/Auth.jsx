@@ -50,19 +50,78 @@ function Auth() {
 
   const password = watch('password');
 
-  // ✅ EFECTO PARA COUNTDOWN DE BLOQUEO (Tarea 30)
+  // ✅ NUEVO: Verificar bloqueo al montar el componente (persistencia con sessionStorage)
+  useEffect(() => {
+    const checkLockoutStatus = () => {
+      try {
+        const lockoutData = sessionStorage.getItem('loginLockout');
+        
+        if (lockoutData) {
+          const { lockedUntil, countdown: storedCountdown } = JSON.parse(lockoutData);
+          const now = Date.now();
+          
+          if (lockedUntil && new Date(lockedUntil).getTime() > now) {
+            // Aún está bloqueado - restaurar estado
+            const remainingSeconds = Math.ceil((new Date(lockedUntil).getTime() - now) / 1000);
+            setIsLocked(true);
+            setLockoutTime(lockedUntil);
+            setCountdown(Math.max(0, remainingSeconds));
+            console.log('🔒 Lockout restored from sessionStorage:', remainingSeconds, 'seconds remaining');
+          } else {
+            // El bloqueo expiró, limpiar
+            sessionStorage.removeItem('loginLockout');
+            console.log('🔓 Lockout expired, cleared from sessionStorage');
+          }
+        }
+      } catch (e) {
+        console.warn('⚠️ Failed to parse lockout data from sessionStorage:', e);
+        sessionStorage.removeItem('loginLockout');
+      }
+    };
+    
+    checkLockoutStatus();
+  }, []);
+
+  // ✅ EFECTO PARA COUNTDOWN DE BLOQUEO (Tarea 30) - ACTUALIZADO CON PERSISTENCIA
   useEffect(() => {
     let timer;
+    
     if (isLocked && countdown > 0) {
+      // Guardar estado en sessionStorage para persistencia al recargar
+      if (lockoutTime) {
+        try {
+          sessionStorage.setItem('loginLockout', JSON.stringify({
+            lockedUntil: lockoutTime,
+            countdown: countdown
+          }));
+        } catch (e) {
+          console.warn('⚠️ Failed to save lockout to sessionStorage:', e);
+        }
+      }
+      
       timer = setInterval(() => {
-        setCountdown(prev => prev - 1);
+        setCountdown(prev => {
+          const newCount = prev - 1;
+          // Limpiar sessionStorage cuando expira
+          if (newCount <= 0) {
+            sessionStorage.removeItem('loginLockout');
+          }
+          return newCount;
+        });
       }, 1000);
     } else if (countdown === 0 && isLocked) {
+      // El bloqueo expiró - liberar cuenta
       setIsLocked(false);
       setLockoutTime(null);
+      setAttemptsRemaining(3); // Resetear a 3 intentos
+      sessionStorage.removeItem('loginLockout');
+      console.log('🔓 Account unlocked, countdown reached 0');
     }
-    return () => clearInterval(timer);
-  }, [isLocked, countdown]);
+    
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [isLocked, countdown, lockoutTime]);
 
   // ✅ FUNCIÓN PARA FORMATEAR TIEMPO (MM:SS)
   const formatCountdown = (seconds) => {
@@ -96,6 +155,7 @@ function Auth() {
     }
   };
 
+  // ✅ ACTUALIZADO: Manejo completo de errores de login con contador de intentos
   const onLoginSubmit = async (data) => {
     setIsLoading(true);
     setError('');
@@ -110,10 +170,12 @@ function Auth() {
       setSuccess('Login successful');
       resetLogin();
     
-      // Resetear contador de intentos
+      // ✅ Resetear contador de intentos y limpiar bloqueo
       setAttemptsRemaining(null);
       setIsLocked(false);
       setCountdown(0);
+      setLockoutTime(null);
+      sessionStorage.removeItem('loginLockout'); // ← Limpiar persistencia
     
       // RF-02.04 - Redirigir al Dashboard
       setTimeout(() => {
@@ -121,12 +183,69 @@ function Auth() {
       }, 1500);
     
     } catch (err) {
-      // ... (manejo de errores existente)
+      console.error('❌ Login error:', err);
+      
+      // ✅ MANEJO DE ERRORES DE LOGIN CON CONTADOR DE INTENTOS (Tarea 30)
+      
+      // Caso 1: Cuenta bloqueada por muchos intentos fallidos
+      if (err.error === 'ACCOUNT_LOCKED') {
+        console.log('🔒 Account locked by backend');
+        setIsLocked(true);
+        
+        // Calcular countdown desde lockedUntil (si el backend lo envía)
+        if (err.lockedUntil) {
+          const lockoutEnd = new Date(err.lockedUntil).getTime();
+          const now = Date.now();
+          const remainingSeconds = Math.ceil((lockoutEnd - now) / 1000);
+          
+          setLockoutTime(err.lockedUntil);
+          setCountdown(Math.max(0, remainingSeconds));
+          
+          setError(`Account locked. Try again in ${formatCountdown(Math.max(0, remainingSeconds))}`);
+          console.log('⏱️ Lockout countdown set to:', remainingSeconds, 'seconds');
+        } else {
+          // Fallback si el backend no envía lockedUntil
+          const defaultLockoutMinutes = 5;
+          setCountdown(defaultLockoutMinutes * 60);
+          setError(`Account locked. Try again in ${defaultLockoutMinutes} minutes`);
+          console.log('⏱️ Using default lockout:', defaultLockoutMinutes, 'minutes');
+        }
+        
+      } 
+      // Caso 2: Contraseña incorrecta con información de intentos restantes
+      else if (err.error === 'WRONG_PASSWORD' && err.attemptsRemaining !== undefined) {
+        const attemptsLeft = err.attemptsRemaining;
+        console.log('🔐 Wrong password, attempts remaining:', attemptsLeft);
+        
+        if (attemptsLeft > 0) {
+          setAttemptsRemaining(attemptsLeft);
+          setError(`${attemptsLeft} ${attemptsLeft === 1 ? 'attempt' : 'attempts'} remaining before account is locked`);
+        } else {
+          // Se acabaron los intentos, bloquear inmediatamente
+          console.log('🔒 No attempts remaining, locking account');
+          setIsLocked(true);
+          setCountdown(5 * 60); // 5 minutos por defecto (coincide con backend)
+          setError('Account locked. Try again in 5 minutes');
+        }
+        
+      } 
+      // Caso 3: Errores de auth genéricos (no revelar información sensible)
+      else if (err.error === 'EMAIL_NOT_FOUND' || err.error === 'WRONG_PASSWORD') {
+        console.log('🔐 Auth error:', err.error);
+        // Para seguridad, no mostrar si el email existe o no
+        setError('Invalid email or password');
+        
+      } 
+      // Caso 4: Error genérico o de red
+      else {
+        console.error('❌ Unknown login error:', err);
+        setError(err.message || 'Error al iniciar sesión. Please try again.');
+      }
+      
     } finally {
       setIsLoading(false);
     } 
   };
- 
 
   // Cambiar de tab y limpiar errores
   const handleTabChange = (tab) => {

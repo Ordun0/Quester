@@ -230,7 +230,7 @@ class AuthService {
 
   async generateItinerary(token, payload) {
     const response = await axios.post(
-      `${API_BASE_URL}/api/extraction`,
+      `${API_BASE_URL}/extraction`,
       payload,
       {
         headers: {
