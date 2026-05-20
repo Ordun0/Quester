@@ -1,5 +1,3 @@
-// gcpService.js
-
 const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
@@ -11,9 +9,9 @@ const { getAirportCode } = require('../utils/airportCodes');
 const docClient = new DynamoDBClient({ region: process.env.AWS_REGION });
 
 // ===========================================
-// ✅ UTILIDAD: Construir prompt para Gemini - MEJORADO (English + Budget + Transport)
+// ✅ UTILIDAD: Construir prompt para Gemini - MEJORADO CON BUDGET LOOP + CUSTOM NOTES
 // ===========================================
-function buildGeminiPrompt(tripData, travelers, preferences, budget) {
+function buildGeminiPrompt(tripData, travelers, preferences, budget, userComments = null) {
   var interests = travelers?.flatMap(function(t) { return t.interests; }) || [];
   var ecoFriendly = preferences?.ecoFriendly ? ' (eco-friendly options preferred)' : '';
   
@@ -29,6 +27,35 @@ function buildGeminiPrompt(tripData, travelers, preferences, budget) {
     activities: 30,
     transport: 5
   };
+  
+  // ✅ Procesar customNotes como requisitos adicionales
+  var customNotesSection = preferences?.customNotes && preferences.customNotes.trim() !== ''
+    ? `
+## 🎯 USER ADDITIONAL REQUIREMENTS (MANDATORY):
+The user has specified the following additional preferences. THESE MUST BE RESPECTED:
+"${preferences.customNotes}"
+
+Instructions:
+- If the user mentions a specific place, activity, or type of experience, INCLUDE it in the itinerary if feasible
+- If the user mentions avoiding something, EXCLUDE it completely
+- If the requirement conflicts with budget/dates, find the closest feasible alternative and explain in recommendations
+` 
+    : '';
+  
+  // ✅ Sección de comentarios del usuario para regeneración
+  var userFeedbackSection = userComments && userComments.trim() !== '' 
+    ? `
+## ⚠️ USER FEEDBACK FOR REGENERATION:
+The user has provided the following feedback about a previous version of this itinerary. PLEASE ADJUST THE NEW ITINERARY TO ADDRESS THESE CONCERNS:
+"${userComments}"
+
+Important: 
+- If the user mentions avoiding specific places, REMOVE them from the itinerary
+- If the user wants fewer activities per day, REDUCE the number of activities and add more free time
+- If the user didn't like a hotel type, SELECT DIFFERENT accommodation options
+- Always respect the core trip details (dates, budget, destination) while incorporating this feedback
+` 
+    : '';
   
   return `
 You are a professional travel planner assistant. Create a detailed, day-by-day itinerary for a trip to ${tripData?.destination || 'Unknown'}.
@@ -50,7 +77,7 @@ You are a professional travel planner assistant. Create a detailed, day-by-day i
 - Flights: ${Array.isArray(tripData?.flights?.outboundFlights) ? tripData.flights.outboundFlights.length : 0} outbound options
 - Hotels: ${Array.isArray(tripData?.hotels?.optimalHotels) ? tripData.hotels.optimalHotels.length : 0} recommended hotels
 - Restaurants: ${Array.isArray(tripData?.restaurants) ? tripData.restaurants.length : 0} local dining options
-- Attractions: ${Array.isArray(tripData?.attractions) ? tripData.attractions.length : 0} tourist attractions
+- Attractions: ${Array.isArray(tripData?.attractions) ? tripData.attractions.length : 0} tourist attractions${userFeedbackSection}${customNotesSection}
 
 ## Requirements:
 1. Create one activity per time slot (morning, afternoon, evening)
@@ -60,9 +87,14 @@ You are a professional travel planner assistant. Create a detailed, day-by-day i
 5. Respect opening hours and avoid scheduling conflicts
 6. Include meal breaks at appropriate times
 7. Add buffer time for transitions
-8. Stay within total budget: ${budgetCurrency}${budgetTotal}
-9. ✅ RESPECT BUDGET DISTRIBUTION: When selecting activities, restaurants, and transport options, ensure the estimated costs align with the budget distribution percentages provided above. For example, if transport is 5% of a $1000 budget, keep transport-related expenses around $50 total.
+8. ✅ BUDGET VALIDATION LOOP: Before finalizing the itinerary, VERIFY that the total estimated cost does not exceed ${budgetCurrency}${budgetTotal}. If it does, ADJUST by:
+   a) Selecting more economical flight/hotel options from the available list
+   b) Replacing expensive activities with free/low-cost alternatives
+   c) Reducing the number of paid activities if necessary
+   d) Repeat this validation up to 2 times internally until the budget is met
+9. ✅ RESPECT BUDGET DISTRIBUTION: When selecting activities, restaurants, and transport options, ensure the estimated costs align with the budget distribution percentages provided above.
 10. ✅ PROVIDE TRANSPORT GUIDANCE: For each activity transition, recommend the best transport method (walking, metro, taxi, Uber, bus, etc.) based on distance, cost, and local availability.
+11. ✅ PRIORITIZE COST-EFFECTIVE OPTIONS: When multiple options are available, prefer the more economical choice that still meets quality standards, to stay within budget.
 
 ## Output Format (JSON):
 {
@@ -74,6 +106,205 @@ You are a professional travel planner assistant. Create a detailed, day-by-day i
 
 Return ONLY valid JSON, no markdown, no explanations outside the JSON structure.
 `.trim();
+}
+
+// ===========================================
+// ✅ NUEVO: Construir prompt ESPECIAL para REGENERACIÓN - MEJORADO CON FEEDBACK EXPLÍCITO
+// ===========================================
+function buildRegenerationPrompt(tripData, travelers, budget, preferences, userComments, originalTripId = null) {
+  var interests = travelers?.flatMap(function(t) { return t.interests; }) || [];
+  var ecoFriendly = preferences?.ecoFriendly ? ' (eco-friendly options preferred)' : '';
+  
+  // ✅ Valores por defecto seguros para budget
+  var budgetTotal = budget?.total || 0;
+  var budgetCurrency = budget?.currency || 'USD';
+  
+  // ✅ Budget distribution percentages from Step 2
+  var budgetDistribution = preferences?.budgetDistribution || {
+    flights: 20,
+    hotels: 15,
+    food: 30,
+    activities: 30,
+    transport: 5
+  };
+
+  // ✅ Procesar customNotes como requisitos adicionales
+  var customNotesSection = preferences?.customNotes && preferences.customNotes.trim() !== ''
+    ? `
+## 🎯 USER ADDITIONAL REQUIREMENTS (MANDATORY):
+"${preferences.customNotes}"
+
+Instructions:
+- If the user mentions a specific place, activity, or type of experience, INCLUDE it in the itinerary if feasible
+- If the user mentions avoiding something, EXCLUDE it completely
+- If the requirement conflicts with budget/dates, find the closest feasible alternative
+` 
+    : '';
+
+  return `
+🔄 REGENERATION MODE - CRITICAL INSTRUCTIONS:
+You are a professional travel planner assistant. The user wants to REGENERATE their existing itinerary with specific feedback.
+
+## ⚠️ THIS IS A MODIFICATION, NOT A NEW CREATION:
+- Keep the overall structure, destination, dates, and budget INTACT
+- ONLY modify the aspects explicitly mentioned in the user's feedback
+- If the user doesn't mention something, KEEP it as is from the original
+- Maintain the same level of detail and JSON formatting as the original itinerary
+- Do NOT change trip fundamentals (destination, dates, total budget, number of travelers)
+
+## Original Trip Details (DO NOT CHANGE THESE):
+- Destination: ${tripData?.destination || 'Unknown'}
+- Dates: ${tripData?.startDate || 'TBD'} to ${tripData?.endDate || 'TBD'} (${tripData?.duration || 7} days)
+- Travelers: ${travelers?.length || 1} (${travelers?.map(function(t) { return t.type; }).join(', ') || 'adult'})
+- Interests: ${interests.join(', ') || 'general tourism'}${ecoFriendly}
+- Total Budget: ${budgetCurrency}${budgetTotal}
+- Budget Distribution:
+  • Flights: ${budgetDistribution.flights}%
+  • Hotels: ${budgetDistribution.hotels}%
+  • Food & Dining: ${budgetDistribution.food}%
+  • Activities & Tours: ${budgetDistribution.activities}%
+  • Transport: ${budgetDistribution.transport}%
+
+## ⚠️ USER FEEDBACK - WHAT TO CHANGE:
+"${userComments}"
+
+### How to interpret and APPLY the feedback (STEP-BY-STEP):
+1. PARSE the feedback: Identify what the user wants to ADD, REMOVE, or MODIFY
+2. LOCATE the relevant parts in the original itinerary structure
+3. APPLY the change:
+   - If "remove X" or "don't want X": EXCLUDE that place/activity/type from ALL days
+   - If "add more X" or "I want more X": INCREASE frequency of that activity type while respecting budget
+   - If "fewer activities" or "less packed": REDUCE to 2-3 activities per day, add buffer time between them
+   - If "different hotel" or "hotel doesn't suit": SELECT a different hotel with similar price/rating but different style
+   - If preference change (e.g., "more eco-friendly"): ADJUST recommendations accordingly
+4. VALIDATE: Ensure the modified itinerary still respects budget, dates, and feasibility
+5. If budget is exceeded after changes, ADJUST by selecting more economical options (repeat up to 2 times)
+6. If feedback is vague: Make reasonable adjustments while preserving the overall trip experience
+
+## 🎯 ADDITIONAL USER REQUIREMENTS:${customNotesSection}
+
+## Requirements for the REGENERATED itinerary:
+1. ✅ Keep the same destination, dates, and total budget
+2. ✅ Maintain one activity per time slot UNLESS user requested fewer activities
+3. ✅ Include realistic travel times between locations
+4. ✅ Prioritize walking and public transport${ecoFriendly ? ', and eco-friendly options' : ''}
+5. ✅ Match activities to traveler interests: ${interests.join(', ')}
+6. ✅ Respect opening hours and avoid scheduling conflicts
+7. ✅ Include meal breaks at appropriate times
+8. ✅ Add buffer time for transitions, especially if user requested fewer activities
+9. ✅ BUDGET VALIDATION LOOP: Before finalizing, VERIFY total cost ≤ ${budgetCurrency}${budgetTotal}. If exceeded:
+   a) Select more economical flight/hotel options from available list
+   b) Replace expensive activities with free/low-cost alternatives
+   c) Reduce number of paid activities if necessary
+   d) Repeat validation up to 2 times internally until budget is met
+10. ✅ Respect budget distribution percentages when selecting options
+11. ✅ APPLY USER FEEDBACK: Adjust the itinerary to address "${userComments}" while maintaining trip feasibility
+12. ✅ PRIORITIZE COST-EFFECTIVE OPTIONS: When multiple options exist, prefer economical choices that meet quality standards
+
+## Output Format (JSON ONLY - EXACT STRUCTURE):
+{
+  "summary": {
+    "title": "Catchy itinerary title",
+    "description": "Brief description of the trip",
+    "destination": "${tripData?.destination}",
+    "duration": ${tripData?.duration || 7},
+    "totalBudget": ${budgetTotal},
+    "currency": "${budgetCurrency}",
+    "travelDates": { "start": "${tripData?.startDate}", "end": "${tripData?.endDate}" }
+  },
+  "dailyPlan": [
+    {
+      "day": 1,
+      "date": "${tripData?.startDate}",
+      "theme": "Day theme",
+      "activities": [
+        {
+          "startTime": "HH:MM",
+          "endTime": "HH:MM", 
+          "type": "attraction|restaurant|transport|hotel",
+          "name": "Place name",
+          "description": "Brief description",
+          "location": "Area/neighborhood",
+          "price": { "amount": 0, "currency": "${budgetCurrency}", "formatted": "$0" },
+          "duration": 90,
+          "crowdLevel": "quiet|moderate|busy",
+          "transport": {
+            "fromPrevious": "walking|public-transport|taxi|uber|bus|metro",
+            "estimatedTime": "X min",
+            "recommendedMethod": "Brief justification for this transport choice",
+            "estimatedCost": { "amount": 0, "currency": "${budgetCurrency}", "formatted": "$0" }
+          }
+        }
+      ],
+      "dailySummary": "Summary of the day"
+    }
+  ],
+  "budgetBreakdown": {
+    "flights": 0,
+    "hotels": 0,
+    "food": 0,
+    "activities": 0,
+    "transport": 0,
+    "contingency": 0,
+    "total": ${budgetTotal}
+  },
+  "recommendations": {
+    "packingTips": ["tip1", "tip2"],
+    "localCustoms": ["custom1", "custom2"],
+    "bestTimeToVisit": "Recommendation based on climate and season",
+    "weatherConsiderations": "Guidance based on destination and dates",
+    "transportGuidance": "General transport tips for ${tripData?.destination}"
+  },
+  "selectedHotel": {
+    "name": "Hotel name",
+    "rating": 4.5,
+    "reviews": 100,
+    "publicTransport": { "nearest": "Station name", "duration": "5 min walk" },
+    "pricePerNight": { "amount": 100, "currency": "${budgetCurrency}", "formatted": "$100" },
+    "totalPrice": { "amount": 300, "currency": "${budgetCurrency}", "formatted": "$300" },
+    "freeCancellation": true,
+    "checkInTime": "15:00",
+    "checkOutTime": "11:00",
+    "amenities": ["WiFi", "Breakfast", "AC"],
+    "gps": { "lat": 0, "lng": 0 }
+  },
+  "selectedRestaurants": [
+    { "name": "Restaurant", "category": "Cuisine", "pricePerPerson": { "amount": 25, "currency": "${budgetCurrency}" }, "rating": 4.5, "gps": { "lat": 0, "lng": 0 } }
+  ],
+  "selectedAttractions": [
+    { "name": "Attraction", "type": "Type", "rating": 4.5, "openingHours": "9:00-18:00", "gps": { "lat": 0, "lng": 0 } }
+  ],
+  "flights": {
+    "optimalFlight": {
+      "airline": { "name": "Airline", "code": "XX" },
+      "departure": { "airport": { "name": "Airport", "code": "XXX" }, "time": "ISO date" },
+      "arrival": { "airport": { "name": "Airport", "code": "XXX" }, "time": "ISO date" },
+      "duration": { "formatted": "Xh Ym", "minutes": 0 },
+      "price": { "amount": 0, "currency": "${budgetCurrency}", "formatted": "$0" },
+      "baggage": { "details": "Baggage info" },
+      "layovers": []
+    }
+  },
+  "transport": { "generalGuidance": "General transport tips" },
+  "weather": { "forecast": { "snippet": "Weather info", "recommendation": "Packing advice" } },
+  "packingList": ["item1", "item2"],
+  "travelTips": ["tip1", "tip2"],
+  "emergencyContacts": [{ "name": "Service", "phone": "+123", "type": "type" }]
+}
+
+## Critical Rules:
+- Return ONLY valid JSON, no markdown, no text before or after the JSON
+- Use the data patterns from the original itinerary when possible
+- If specific data is missing, use reasonable default values
+- Ensure dailyPlan has exactly ${tripData?.duration || 7} days
+- ✅ Apply user feedback: "${userComments}" - FOLLOW THE STEP-BY-STEP PROCESS ABOVE
+- ✅ If user wants fewer activities: reduce to 2-3 activities per day with buffer time
+- ✅ If user wants to avoid something: completely exclude it from all days
+- ✅ If user wants more of something: increase frequency while respecting budget
+- ✅ BUDGET CHECK: Verify total ≤ ${budgetCurrency}${budgetTotal} before returning; adjust internally if needed (max 2 iterations)
+- ✅ CUSTOM NOTES: Honor "${preferences?.customNotes || 'none'}" as mandatory requirements
+
+Generate the REGENERATED itinerary now, applying all instructions above:`.trim();
 }
 
 // ===========================================
@@ -269,20 +500,17 @@ class GCPService {
     if (travelers === undefined) travelers = 1;
     
     // ✅ Normalizar travelClass a valores válidos para SerpAPI Google Flights
-    // SerpAPI espera: '1'=economy, '2'=premium economy, '3'=business, '4'=first
     var classMap = {
-      'economy': '1', '1': '1', 1: '1', '0': '1', 0: '1',  // 0 o '0' → economy (fallback seguro)
+      'economy': '1', '1': '1', 1: '1', '0': '1', 0: '1',
       'premium': '2', '2': '2', 2: '2', 'premium_economy': '2',
       'business': '3', '3': '3', 3: '3',
       'first': '4', '4': '4', 4: '4'
     };
     
-    // ✅ Convertir a string y mapear, con fallback a '1' (economy)
     travelClass = classMap[String(travelClass)] || '1';
     
     if (currency === undefined) currency = 'USD';
     
-    // ✅ DEBUG: Log detallado del origen antes de procesar
     console.log('🔍 [Flights] DEBUG - Origin input:', {
       raw: origin,
       typeof: typeof origin,
@@ -292,11 +520,9 @@ class GCPService {
       upper: origin?.toUpperCase()?.trim()
     });
     
-    // ✅ Usar función importada desde airportCodes.js
     var originCode = getAirportCode(origin);
     var destinationCode = getAirportCode(destination);
     
-    // ✅ DEBUG: Log resultado de getAirportCode
     console.log('✈️ [Flights] Airport code resolution:', {
       origin: origin,
       originCode: originCode,
@@ -322,7 +548,6 @@ class GCPService {
       throw new Error('Could not resolve airport codes for: origin=' + origin + ', destination=' + destination + '. Please use airport codes (e.g., JFK, LAX) or well-known city names.');
     }
     
-    // ✅ El mismo travelClass se usa para outbound y return en la función GCP flights
     return this._callGCPFunction('flights', { 
       origin: originCode, 
       destination: destinationCode, 
@@ -347,9 +572,7 @@ class GCPService {
     });
   }
 
-  // ✅ WEATHER: Retornar estructura segura sin llamada externa (Gemini generará guidance)
   async getWeather(destination, startDate, endDate) {
-    // ✅ Retornar estructura segura que Gemini usará para generar recomendaciones climáticas
     return Promise.resolve({
       success: true,
       data: {
@@ -383,12 +606,8 @@ class GCPService {
     });
   }
 
-  async getTransport(destination) {
-    return this._callGCPFunction('transport', { destination: destination });
-  }
-
   // ===========================================
-  // ✅ NUEVO: Extraer y consolidar datos
+  // ✅ NUEVO: Extraer y consolidar datos - SIN WEATHER/TRANSPORT DE GCP
   // ===========================================
   async extractAndConsolidate(tripData, travelers, budget, preferences) {
     var extractionId = 'ext_' + uuidv4();
@@ -413,7 +632,6 @@ class GCPService {
       var currency = budget?.currency || 'USD';
       var budgetTotal = budget?.total;
 
-      // ✅ DEBUG: Log de datos de entrada
       console.log('🔍 [Extraction] Input data:', {
         origin,
         destination,
@@ -435,7 +653,6 @@ class GCPService {
         travelersCount, hotelClass, budgetTotal
       ).catch(function(e) { return { success: false, error: e.message, data: null }; });
       
-      // ✅ Weather: ya retorna estructura segura sin llamada externa
       var weatherPromise = this.getWeather(destination, startDate, endDate)
         .catch(function(e) { return { success: false, error: e.message, data: null }; });
       
@@ -447,8 +664,7 @@ class GCPService {
         destination, interests, duration, startDate
       ).catch(function(e) { return { success: false, error: e.message, data: null }; });
       
-      var transportPromise = this.getTransport(destination)
-        .catch(function(e) { return { success: false, error: e.message, data: null }; });
+      var transportPromise = Promise.resolve({ success: true, data: null });
 
       var results = await Promise.allSettled([
         flightsPromise, hotelsPromise, weatherPromise,
@@ -460,7 +676,6 @@ class GCPService {
       var weather = results[2];
       var restaurants = results[3];
       var attractions = results[4];
-      var transport = results[5];
 
       var durationMs = Date.now() - startTime;
 
@@ -476,10 +691,10 @@ class GCPService {
         attractions: attractions.status === 'fulfilled' && attractions.value?.success 
           ? (attractions.value.data?.activities || attractions.value.data?.attractions || []) 
           : [],
-        transport: transport.status === 'fulfilled' && transport.value?.success ? transport.value.data?.transport : null,
+        transport: null,
         summary: {
           totalFunctions: 6,
-          successfulFunctions: [flights, hotels, weather, restaurants, attractions, transport].filter(
+          successfulFunctions: [flights, hotels, weather, restaurants, attractions].filter(
             function(r) { return r.status === 'fulfilled' && r.value?.success; }
           ).length,
           totalItems: {
@@ -489,7 +704,7 @@ class GCPService {
             attractions: attractions.status === 'fulfilled' && attractions.value?.success 
               ? ((attractions.value.data?.activities || attractions.value.data?.attractions)?.length || 0) 
               : 0,
-            transport: transport.status === 'fulfilled' && transport.value?.success ? transport.value.data?.transport?.options?.length || 0 : 0
+            transport: 0
           }
         }
       };
@@ -518,20 +733,21 @@ class GCPService {
   }
 
   // ===========================================
-  // ✅ NUEVO: Generar itinerario con Gemini - SIMPLIFICADO
+  // ✅ NUEVO: Generar itinerario con Gemini - CON SOPORTE PARA USER COMMENTS + BUDGET LOOP
   // ===========================================
-  async generateItineraryWithGemini(payload) {
+  async generateItineraryWithGemini(payload, userComments = null) {
     var itineraryId = 'itin_' + uuidv4();
     var startTime = Date.now();
 
     console.log('🤖 [Gemini] Starting itinerary generation', {
       itineraryId: itineraryId,
-      destination: payload.tripData?.destination
+      destination: payload.tripData?.destination,
+      hasUserComments: !!userComments
     });
 
     try {
-      // ✅ Construir prompt simple y directo
-      var prompt = this._buildSimplePrompt(payload);
+      // ✅ Construir prompt con soporte para comentarios del usuario + budget loop
+      var prompt = this._buildSimplePrompt(payload, userComments);
 
       // ✅ Payload para Gemini: solo prompt + datos estructurados
       var geminiPayload = {
@@ -634,22 +850,125 @@ class GCPService {
   }
 
   // ===========================================
-  // ✅ UTILIDAD: Construir prompt simple y directo - MEJORADO (English + Budget + Transport)
+  // ✅ NUEVO: Regenerar itinerario con feedback del usuario - PROMPT MEJORADO
   // ===========================================
-  _buildSimplePrompt(payload) {
+  async regenerateItineraryWithFeedback(tripData, travelers, budget, preferences, userComments, originalTripId = null) {
+    var itineraryId = 'itin_' + uuidv4();
+    var startTime = Date.now();
+
+    console.log('🔄 [Gemini] Starting itinerary REGENERATION with feedback', {
+      itineraryId: itineraryId,
+      destination: tripData?.destination,
+      originalTripId: originalTripId,
+      userComments: userComments?.substring(0, 100)
+    });
+
+    try {
+      // ✅ Construir prompt ESPECIAL de regeneración MEJORADO
+      var prompt = buildRegenerationPrompt(tripData, travelers, budget, preferences, userComments, originalTripId);
+
+      // ✅ Payload para Gemini con configuración optimizada para regeneración
+      var geminiPayload = {
+        contents: [{ 
+          parts: [{ 
+            text: prompt 
+          }] 
+        }],
+        generationConfig: {
+          temperature: 0.15,  // ✅ MÁS BAJO para regeneración: más determinista, sigue instrucciones mejor
+          topP: 0.95,
+          topK: 40,
+          maxOutputTokens: 50000,  // Más tokens para itinerarios complejos
+          responseMimeType: "application/json"
+        }
+      };
+
+      // ✅ Llamar directamente a Gemini API
+      var geminiApiKey = process.env.GEMINI_API_KEY;
+      var geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`;
+
+      console.log('📤 [Gemini] Calling Gemini API for regeneration...');
+      var response = await axios.post(geminiUrl, geminiPayload, {
+        headers: { 'Content-Type': 'application/json' },
+        timeout: 180000
+      });
+
+      var totalDuration = Date.now() - startTime;
+      var responseText = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      
+      console.log('📥 [Gemini] Regeneration response received:', {
+        finishReason: response.data?.candidates?.[0]?.finishReason,
+        tokenCount: response.data?.usageMetadata?.candidatesTokenCount,
+        textLength: responseText?.length || 0
+      });
+
+      if (!responseText) {
+        throw new Error('No response text from Gemini for regeneration');
+      }
+
+      // ✅ Parsear JSON de respuesta
+      var itineraryData;
+      try {
+        itineraryData = JSON.parse(responseText);
+        console.log('✅ [Gemini] Regeneration JSON parsed successfully');
+      } catch (parseError) {
+        var jsonMatch = responseText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          itineraryData = JSON.parse(jsonMatch[0]);
+        } else {
+          throw new Error('Failed to parse regeneration response as JSON: ' + parseError.message);
+        }
+      }
+
+      // ✅ Validar estructura mínima
+      if (!itineraryData?.summary?.title || !Array.isArray(itineraryData?.dailyPlan)) {
+        console.warn('⚠️ [Gemini] Regeneration response missing required fields, using fallback');
+        itineraryData = this._generateFallbackItinerary({ tripData, travelers, budget, preferences });
+      }
+
+      console.log('✅ [Gemini] Itinerary regenerated successfully', {
+        itineraryId: itineraryId,
+        duration: totalDuration + 'ms',
+        days: itineraryData?.dailyPlan?.length,
+        activities: itineraryData?.dailyPlan?.reduce(function(sum, day) { 
+          return sum + (day?.activities?.length || 0); 
+        }, 0)
+      });
+
+      return {
+        success: true,
+        itineraryId: itineraryId,
+        duration: totalDuration + 'ms',
+        data: itineraryData
+      };
+
+    } catch (error) {
+      console.error('❌ [Gemini] Regeneration failed:', { error: error.message });
+      
+      var fallbackData = this._generateFallbackItinerary({ tripData, travelers, budget, preferences });
+      
+      return {
+        success: true,
+        itineraryId: 'itin_fallback_' + uuidv4(),
+        duration: Date.now() - startTime + 'ms',
+        data: fallbackData,
+        warning: 'Regeneration failed, generated fallback due to: ' + error.message
+      };
+    }
+  }
+
+  // ===========================================
+  // ✅ UTILIDAD: Construir prompt simple y directo - CON BUDGET LOOP + CUSTOM NOTES
+  // ===========================================
+  _buildSimplePrompt(payload, userComments = null) {
     var { tripData, travelers, budget, preferences, flights, hotels, restaurants, attractions, weather, transport } = payload;
   
-    // ✅ Safe access para flights que puede ser null
     var outboundFlights = flights?.outboundFlights || [];
     var returnFlights = flights?.returnFlights || [];
     var flightPrice = outboundFlights[0]?.price?.amount || 0;
     var flightDuration = outboundFlights[0]?.duration?.formatted || 'N/A';
     
-    // ✅ Safe access para weather
     var weatherSnippet = weather?.forecast?.snippet || 'Weather considerations will be included in your itinerary.';
-    
-    // ✅ Safe access para transport tips (fallback)
-    var transportTips = Array.isArray(transport?.tips) ? transport.tips : [];
     
     // ✅ Budget distribution percentages from Step 2
     var budgetDistribution = preferences?.budgetDistribution || {
@@ -659,6 +978,35 @@ class GCPService {
       activities: 30,
       transport: 5
     };
+    
+    // ✅ Procesar customNotes como requisitos adicionales
+    var customNotesSection = preferences?.customNotes && preferences.customNotes.trim() !== ''
+      ? `
+## 🎯 USER ADDITIONAL REQUIREMENTS (MANDATORY):
+The user has specified the following additional preferences. THESE MUST BE RESPECTED:
+"${preferences.customNotes}"
+
+Instructions:
+- If the user mentions a specific place, activity, or type of experience, INCLUDE it in the itinerary if feasible
+- If the user mentions avoiding something, EXCLUDE it completely
+- If the requirement conflicts with budget/dates, find the closest feasible alternative and explain in recommendations
+` 
+      : '';
+    
+    // ✅ Sección de comentarios del usuario para regeneración
+    var userFeedbackSection = userComments && userComments.trim() !== '' 
+      ? `
+## ⚠️ USER FEEDBACK FOR REGENERATION:
+The user has provided the following feedback about a previous version of this itinerary. PLEASE ADJUST THE NEW ITINERARY TO ADDRESS THESE CONCERNS:
+"${userComments}"
+
+Important: 
+- If the user mentions avoiding specific places, REMOVE them from the itinerary
+- If the user wants fewer activities per day, REDUCE the number of activities and add more free time
+- If the user didn't like a hotel type, SELECT DIFFERENT accommodation options
+- Always respect the core trip details (dates, budget, destination) while incorporating this feedback
+` 
+      : '';
   
     var extractionData = {
       trip: {
@@ -672,7 +1020,7 @@ class GCPService {
       budget: { 
         total: budget?.total, 
         currency: budget?.currency,
-        distribution: budgetDistribution  // ✅ Incluir distribución de presupuesto
+        distribution: budgetDistribution
       },
       preferences: preferences,
       flights: {
@@ -714,8 +1062,7 @@ class GCPService {
           rating: a?.rating
         };
       }),
-      weather: weatherSnippet,
-      transport: transportTips
+      weather: weatherSnippet
     };
 
     return `You are a professional travel planner assistant. Create a detailed, day-by-day itinerary for a trip to ${tripData?.destination || 'Unknown'}.
@@ -737,7 +1084,7 @@ class GCPService {
 - Flights: ${outboundFlights.length} outbound options available
 - Hotels: ${(hotels?.optimalHotels || []).length} recommended hotels
 - Restaurants: ${restaurants?.length || 0} local dining options
-- Attractions: ${attractions?.length || 0} tourist attractions
+- Attractions: ${attractions?.length || 0} tourist attractions${userFeedbackSection}${customNotesSection}
 
 ## Requirements:
 1. Create one activity per time slot (morning, afternoon, evening)
@@ -747,9 +1094,14 @@ class GCPService {
 5. Respect opening hours and avoid scheduling conflicts
 6. Include meal breaks at appropriate times
 7. Add buffer time for transitions
-8. Stay within total budget: ${budget?.currency || 'USD'}${budget?.total || 0}
-9. ✅ RESPECT BUDGET DISTRIBUTION: When selecting activities, restaurants, and transport options, ensure the estimated costs align with the budget distribution percentages provided above. For example, if transport is 5% of a $1000 budget, keep transport-related expenses around $50 total.
+8. ✅ BUDGET VALIDATION LOOP: Before finalizing the itinerary, VERIFY that the total estimated cost does not exceed ${budget?.currency || 'USD'}${budget?.total || 0}. If it does, ADJUST by:
+   a) Selecting more economical flight/hotel options from the available list
+   b) Replacing expensive activities with free/low-cost alternatives
+   c) Reducing the number of paid activities if necessary
+   d) Repeat this validation up to 2 times internally until the budget is met
+9. ✅ RESPECT BUDGET DISTRIBUTION: When selecting activities, restaurants, and transport options, ensure the estimated costs align with the budget distribution percentages provided above.
 10. ✅ PROVIDE TRANSPORT GUIDANCE: For each activity transition, recommend the best transport method (walking, metro, taxi, Uber, bus, etc.) based on distance, cost, and local availability. Include this in the "transport" field of each activity.
+11. ✅ PRIORITIZE COST-EFFECTIVE OPTIONS: When multiple options are available, prefer the more economical choice that still meets quality standards, to stay within budget.
 
 ## Weather Considerations:
 Based on the destination (${tripData?.destination}) and travel dates (${tripData?.startDate} to ${tripData?.endDate}), include in recommendations.weatherConsiderations:
@@ -827,7 +1179,9 @@ For each activity in the daily plan, include in the "transport" object:
 - Ensure dailyPlan has exactly ${tripData?.duration || 7} days
 - ✅ Include realistic weatherConsiderations based on destination and dates
 - ✅ Include transport recommendations for each activity with method, time, and cost
-- ✅ Respect budget distribution percentages when estimating activity costs
+- ✅ Respect budget distribution percentages when estimating activity costs${userComments && userComments.trim() !== '' ? `
+- ✅ INCORPORATE USER FEEDBACK: Adjust the itinerary to address the user's comments while maintaining trip feasibility` : ''}${preferences?.customNotes && preferences.customNotes.trim() !== '' ? `
+- ✅ HONOR CUSTOM NOTES: Include "${preferences.customNotes}" as mandatory requirements` : ''}
 
 Generate now:`.trim();
   }
@@ -868,7 +1222,7 @@ Generate now:`.trim();
             price: { amount: 0, currency: 'USD', formatted: '$0' },
             duration: 120,
             crowdLevel: 'moderate',
-            transport: { fromPrevious: null, estimatedTime: '15 min', recommendedMethod: 'walking' }
+            transport: { fromPrevious: null, estimatedTime: '15 min', recommendedMethod: 'walking', estimatedCost: { amount: 0, currency: 'USD', formatted: '$0' } }
           },
           {
             startTime: '12:00',
@@ -880,7 +1234,7 @@ Generate now:`.trim();
             price: { amount: 25, currency: 'USD', formatted: '$25' },
             duration: 90,
             crowdLevel: 'moderate',
-            transport: { fromPrevious: 'walking', estimatedTime: '10 min', recommendedMethod: 'walking' }
+            transport: { fromPrevious: 'walking', estimatedTime: '10 min', recommendedMethod: 'walking', estimatedCost: { amount: 0, currency: 'USD', formatted: '$0' } }
           },
           {
             startTime: '14:00',
@@ -892,7 +1246,7 @@ Generate now:`.trim();
             price: { amount: 15, currency: 'USD', formatted: '$15' },
             duration: 180,
             crowdLevel: 'busy',
-            transport: { fromPrevious: 'public-transport', estimatedTime: '20 min', recommendedMethod: 'public-transport' }
+            transport: { fromPrevious: 'public-transport', estimatedTime: '20 min', recommendedMethod: 'public-transport', estimatedCost: { amount: 2, currency: 'USD', formatted: '$2' } }
           }
         ],
         dailySummary: 'Day ' + day + ' in ' + (tripData?.destination || 'destination')
@@ -922,15 +1276,16 @@ Generate now:`.trim();
         packingTips: ['Comfortable walking shoes', 'Weather-appropriate clothing'],
         localCustoms: ['Learn basic greetings', 'Carry cash for small purchases'],
         bestTimeToVisit: 'Check local weather before travel',
-        weatherConsiderations: 'Weather guidance will be provided based on your destination and travel dates.'
+        weatherConsiderations: 'Weather guidance will be provided based on your destination and travel dates.',
+        transportGuidance: 'General transport tips will be provided for your destination.'
       }
     };
   }
 
   // ===========================================
-  // FUNCION PRINCIPAL: Generar Itinerario Completo
+  // FUNCION PRINCIPAL: Generar Itinerario Completo - CON SOPORTE PARA USER COMMENTS
   // ===========================================
-  async generateFullItinerary(tripData, travelers, budget, preferences) {
+  async generateFullItinerary(tripData, travelers, budget, preferences, userComments = null) {
     var itineraryId = 'itin_' + uuidv4();
     var startTime = Date.now();
 
@@ -938,7 +1293,8 @@ Generate now:`.trim();
       itineraryId: itineraryId,
       destination: tripData?.destination,
       duration: tripData?.duration,
-      travelers: travelers?.length
+      travelers: travelers?.length,
+      hasUserComments: !!userComments
     });
 
     try {
@@ -960,10 +1316,10 @@ Generate now:`.trim();
         restaurants: extractionResult.data.restaurants,
         attractions: extractionResult.data.attractions,
         weather: extractionResult.data.weather,
-        transport: extractionResult.data.transport
+        transport: null
       };
 
-      var itineraryResult = await this.generateItineraryWithGemini(itineraryPayload);
+      var itineraryResult = await this.generateItineraryWithGemini(itineraryPayload, userComments);
 
       if (!itineraryResult.success) {
         throw new Error('Gemini generation failed: ' + itineraryResult.error);
@@ -1008,19 +1364,20 @@ Generate now:`.trim();
   }
 
   // ===========================================
-  // FUNCION: Generar itinerario con datos ya enriquecidos
+  // FUNCION: Generar itinerario con datos ya enriquecidos - CON SOPORTE PARA USER COMMENTS
   // ===========================================
-  async generateItineraryFromEnrichedData(consolidatedData) {
+  async generateItineraryFromEnrichedData(consolidatedData, userComments = null) {
     var itineraryId = 'itin_' + uuidv4();
     var startTime = Date.now();
 
     console.log('🚀 [GCP Service] Generating itinerary from enriched data', {
       itineraryId: itineraryId,
-      destination: consolidatedData.tripData?.destination
+      destination: consolidatedData.tripData?.destination,
+      hasUserComments: !!userComments
     });
 
     try {
-      var itineraryResult = await this.generateItineraryWithGemini(consolidatedData);
+      var itineraryResult = await this.generateItineraryWithGemini(consolidatedData, userComments);
 
       var totalDuration = Date.now() - startTime;
 
@@ -1060,6 +1417,9 @@ var gcpServiceInstance = new GCPService();
 // ✅ Exportar funciones para uso en controllers
 gcpServiceInstance.extractAndConsolidate = gcpServiceInstance.extractAndConsolidate.bind(gcpServiceInstance);
 gcpServiceInstance.generateItineraryWithGemini = gcpServiceInstance.generateItineraryWithGemini.bind(gcpServiceInstance);
+gcpServiceInstance.regenerateItineraryWithFeedback = gcpServiceInstance.regenerateItineraryWithFeedback.bind(gcpServiceInstance);
 gcpServiceInstance.testConsolidateData = gcpServiceInstance.testConsolidateData.bind(gcpServiceInstance);
 
+// ✅ Exportar funciones utilitarias para uso externo si es necesario
 module.exports = gcpServiceInstance;
+module.exports.buildRegenerationPrompt = buildRegenerationPrompt;

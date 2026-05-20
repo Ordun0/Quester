@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import authService from '../services/auth.service';
-import tripsService from '../services/trips.service';  // ✅ Importar servicio de trips
+import tripsService from '../services/trips.service';
 import logo from '../assets/logo.png';
 
 function Dashboard() {
@@ -11,7 +11,7 @@ function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState(null);
   const [trips, setTrips] = useState([]);
-  const [tripsLoading, setTripsLoading] = useState(false);  // ✅ Estado separado para trips
+  const [tripsLoading, setTripsLoading] = useState(false);
 
   // ✅ RF-04.01 - Cargar datos del usuario al montar
   useEffect(() => {
@@ -57,19 +57,36 @@ function Dashboard() {
       
       if (result.success && result.data?.trips) {
         // ✅ Transformar datos del backend al formato de la UI
-        const formattedTrips = result.data.trips.map(trip => ({
-          tripId: trip.tripId,
-          destination: trip.destination || 'Unknown Destination',
-          startDate: trip.startDate,
-          endDate: trip.endDate,
-          // ✅ Calcular spent basado en budgetBreakdown o usar totalBudget como fallback
-          budget: trip.totalBudget || 0,
-          spent: trip.itinerary?.budgetBreakdown?.total || trip.totalBudget || 0,
-          status: trip.status || 'planned',
-          // ✅ Datos adicionales para la UI
-          itinerarySummary: trip.itinerarySummary,
-          currency: trip.currency || 'USD'
-        }));
+        const formattedTrips = result.data.trips.map(trip => {
+          // ✅ NUEVO: Usar trip.spent si existe (del backend), fallback a cálculo frontend
+          // El backend ahora guarda spent SIN contingency para consistencia con el Dashboard
+          const spent = trip.spent !== undefined 
+            ? trip.spent 
+            : ((trip.itinerary?.budgetBreakdown?.flights || 0) +
+               (trip.itinerary?.budgetBreakdown?.hotels || 0) +
+               (trip.itinerary?.budgetBreakdown?.food || 0) +
+               (trip.itinerary?.budgetBreakdown?.activities || 0) +
+               (trip.itinerary?.budgetBreakdown?.transport || 0));
+          
+          return {
+            tripId: trip.tripId,
+            destination: trip.destination || 'Unknown Destination',
+            startDate: trip.startDate,
+            endDate: trip.endDate,
+            
+            // ✅ Presupuesto total (del request original)
+            budget: trip.totalBudget || trip.budget?.total || 0,
+            
+            // ✅ NUEVO: Usar spent del backend o calcular sin contingency
+            spent: spent,
+            
+            status: trip.status || 'planned',
+            
+            // ✅ Datos adicionales para la UI
+            itinerarySummary: trip.itinerarySummary,
+            currency: trip.currency || 'USD'
+          };
+        });
         
         setTrips(formattedTrips);
         console.log('✅ Loaded trips from backend:', formattedTrips.length);

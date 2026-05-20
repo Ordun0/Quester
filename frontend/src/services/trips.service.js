@@ -4,7 +4,7 @@ import axios from 'axios';
 
 // ✅ CORREGIDO: Usar solo import.meta.env para Vite
 // Vite expone variables con prefijo VITE_ a través de import.meta.env
-const API_BASE_URL = import.meta.env?.VITE_API_URL || 'http://localhost:3000';
+const API_BASE_URL = import.meta.env?.VITE_AWS_BACKEND_URL || 'http://44.200.204.224:3000/api';
 
 /**
  * Servicio para manejar operaciones con trips
@@ -15,7 +15,7 @@ const tripsService = {
    */
   async saveItinerary(token, itineraryPayload) {
     const response = await axios.post(
-      `${API_BASE_URL}/api/trips`,
+      `${API_BASE_URL}/trips`,
       itineraryPayload,
       {
         headers: {
@@ -32,7 +32,7 @@ const tripsService = {
    */
   async getUserTrips(token) {
     const response = await axios.get(
-      `${API_BASE_URL}/api/trips`,
+      `${API_BASE_URL}/trips`,
       {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -47,7 +47,7 @@ const tripsService = {
    */
   async getTripById(token, tripId) {
     const response = await axios.get(
-      `${API_BASE_URL}/api/trips/${tripId}`,
+      `${API_BASE_URL}/trips/${tripId}`,
       {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -62,7 +62,7 @@ const tripsService = {
    */
   async deleteTrip(token, tripId) {
     const response = await axios.delete(
-      `${API_BASE_URL}/api/trips/${tripId}`,
+      `${API_BASE_URL}/trips/${tripId}`,
       {
         headers: {
           'Authorization': `Bearer ${token}`

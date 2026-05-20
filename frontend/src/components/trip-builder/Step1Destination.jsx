@@ -314,7 +314,7 @@ const VALID_LOCATIONS = [
       const start = new Date(startDate);
       const end = new Date(endDate);
       const diffTime = end - start;
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // Incluir ambos días
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
       
       if (diffDays > 0) {
         setDuration(diffDays);
@@ -328,6 +328,24 @@ const VALID_LOCATIONS = [
       setDuration(0);
     }
   }, [startDate, endDate, updateTripData]);
+
+  // ✅ NUEVO: Limpiar durationError cuando el usuario corrija las fechas (RF-06.04.02-03)
+  useEffect(() => {
+    if (startDate && endDate && durationError) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      
+      if (start >= now && end > start) {
+        const maxEndDate = new Date(start);
+        maxEndDate.setMonth(maxEndDate.getMonth() + 10);
+        if (end <= maxEndDate) {
+          setDurationError('');
+        }
+      }
+    }
+  }, [startDate, endDate, durationError]);
 
   // Validar cuando cambian los valores
   useEffect(() => {
@@ -345,7 +363,6 @@ const VALID_LOCATIONS = [
     
     if (value.length >= 2) {
       setIsSearchingOrigin(true);
-      // Filrar locations que coincidan
       const suggestions = VALID_LOCATIONS.filter(loc => 
         loc.toLowerCase().includes(value.toLowerCase())
       );
@@ -366,7 +383,6 @@ const VALID_LOCATIONS = [
     
     if (value.length >= 2) {
       setIsSearchingDestination(true);
-      // Filtrar locations que coincidan
       const suggestions = VALID_LOCATIONS.filter(loc => 
         loc.toLowerCase().includes(value.toLowerCase())
       );
@@ -431,11 +447,19 @@ const VALID_LOCATIONS = [
     }
   };
 
-  // Submit del paso 1
+  // ✅ Submit del paso 1 - CON FIXES DE FRONTEND
   const onSubmit = async (data) => {
+    // ✅ RF-07.01.02: Validar TODOS los campos al intentar enviar y mostrar errores simultáneamente
+    const isValid = await trigger();
+    
+    if (!isValid) {
+      console.log('❌ Validation failed, showing all errors');
+      return;
+    }
+    
     const error = validateDates();
-	
-	console.log('=== DEBUG SUBMIT ===');
+    
+    console.log('=== DEBUG SUBMIT ===');
     console.log('Origin:', data.origin);
     console.log('Destination:', data.destination);
     console.log('Start Date:', data.startDate);
@@ -446,11 +470,11 @@ const VALID_LOCATIONS = [
     console.log('===================');
     
     if (error) {
-	  console.log('❌ VALIDATION ERROR:', error);
+      console.log('❌ VALIDATION ERROR:', error);
       setDurationError(error);
       return;
     }
-	
+    
     if (!data.origin) {
       console.log('❌ ERROR: Origin is required');
     }
@@ -472,7 +496,6 @@ const VALID_LOCATIONS = [
     try {
       const token = sessionStorage.getItem('token');
       
-      // ✅ Enviar origen y destino al backend
       const response = await authService.saveTripStep1(token, {
         origin: data.origin,
         destination: data.destination,
@@ -488,7 +511,7 @@ const VALID_LOCATIONS = [
       onNext();
       
     } catch (err) {
-	  console.error('❌ ERROR from backend:', err);
+      console.error('❌ ERROR from backend:', err);
       if (err.error === 'DESTINATION_NOT_FOUND' || err.error === 'ORIGIN_NOT_FOUND') {
         setDurationError(err.message);
       } else if (err.error === 'INVALID_DATE') {
@@ -521,7 +544,7 @@ const VALID_LOCATIONS = [
         <h3 className="text-xl font-semibold text-quester-dark">Origin, Destination & Dates</h3>
       </div>
 
-      {/* ✅ ORIGEN - Nuevo campo */}
+      {/* ✅ ORIGEN */}
       <div>
         <label htmlFor="origin" className="block text-sm font-medium text-quester-dark mb-2">
           Where from?
@@ -572,6 +595,17 @@ const VALID_LOCATIONS = [
         
         {errors.origin && (
           <p className="mt-1 text-xs text-red-600">{errors.origin.message}</p>
+        )}
+        
+        {/* ✅ RF-08.04.01: Mensaje si no se encuentra el origen */}
+        {origin && 
+         originSuggestions.length === 0 && 
+         !isSearchingOrigin && 
+         origin.length >= 3 && 
+         !VALID_LOCATIONS.includes(origin) && (
+          <p className="mt-1 text-xs text-orange-600">
+            Origin not found, please verify the name
+          </p>
         )}
       </div>
 
@@ -628,14 +662,16 @@ const VALID_LOCATIONS = [
           <p className="mt-1 text-xs text-red-600">{errors.destination.message}</p>
         )}
         
-        {/* Mensaje si no se encuentra el destino */}
-			{/*
-        {destination && destinationSuggestions.length === 0 && !isSearchingDestination && destination.length >= 2 && (
+        {/* ✅ RF-01.01.03: Mensaje si no se encuentra el destino */}
+        {destination && 
+         destinationSuggestions.length === 0 && 
+         !isSearchingDestination && 
+         destination.length >= 3 && 
+         !VALID_LOCATIONS.includes(destination) && (
           <p className="mt-1 text-xs text-orange-600">
             Destination not found, please verify the name
           </p>
         )}
-			*/}
       </div>
 
       {/* ✅ FECHAS */}
@@ -714,30 +750,18 @@ const VALID_LOCATIONS = [
         </div>
       )}
 
-      {/* Next Button */}
+      {/* ✅ Next Button - RF-07.02.01: Siempre habilitado (solo estilo visual) */}
       <div className="flex justify-end pt-4 border-t border-gray-200">
         <button
           type="submit"
-          disabled={!origin || !destination || !startDate || !endDate || duration <= 0 || !!durationError}
-		  onClick={() => {
-    // ✅ DEBUG: Mostrar por qué el botón está deshabilitado
-		  console.log('=== BUTTON STATE ===');
-		  console.log('Origin valid:', !!origin);
-		  console.log('Destination valid:', !!destination);
-  		  console.log('Start Date valid:', !!startDate);
-		  console.log('End Date valid:', !!endDate);
-		  console.log('Duration valid:', duration > 0);
-		  console.log('Duration Error:', durationError);
-		  console.log('Button disabled:', !origin || !destination || !startDate || !endDate || duration <= 0 || !!durationError);
-		  console.log('===================');
-	  }}
+          // ✅ RF-07.02.01: Botón siempre habilitado, validaciones al enviar
           className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium text-base transition-all ${
             !origin || !destination || !startDate || !endDate || duration <= 0 || !!durationError
-              ? 'bg-gray-300 cursor-not-allowed text-gray-500'
+              ? 'bg-gray-300 cursor-not-allowed text-gray-500'  // Solo estilo visual
               : 'bg-quester-blue hover:bg-blue-600 text-white shadow-md hover:shadow-lg'
           }`}
         >
-          Nex
+          Next
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
           </svg>

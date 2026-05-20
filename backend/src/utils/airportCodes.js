@@ -8,6 +8,7 @@
  * Última actualización: 2026
  */
 
+
 const AIRPORT_CODES = {
   // ===========================================
   // 🇺🇸 USA - Principal Airports
@@ -20,6 +21,8 @@ const AIRPORT_CODES = {
   'MANHATTAN': 'JFK',
   'BROOKLYN': 'JFK',
   'QUEENS': 'JFK',
+  'TIJUANA': 'TIJ',
+  'TIJUANA, MEXICO': 'TIJ',
   
   'LOS ANGELES': 'LAX',
   'LA': 'LAX',
@@ -107,7 +110,866 @@ const AIRPORT_CODES = {
   
   'WASHINGTON DULLES': 'IAD',
   'DULLES': 'IAD',
+
+  // ✅ NUEVAS CIUDADES USA AGREGADAS
+  'SAN DIEGO': 'SAN',
+  'SAN DIEGO, USA': 'SAN',
+  'SAN DIEGO, CA': 'SAN',
+  'SAN DIEGO, CALIFORNIA': 'SAN',
   
+  'PORTLAND': 'PDX',
+  'PORTLAND, USA': 'PDX',
+  'PORTLAND, OR': 'PDX',
+  'PORTLAND, OREGON': 'PDX',
+  
+  'AUSTIN': 'AUS',
+  'AUSTIN, USA': 'AUS',
+  'AUSTIN, TX': 'AUS',
+  'AUSTIN, TEXAS': 'AUS',
+  
+  'NASHVILLE': 'BNA',
+  'NASHVILLE, USA': 'BNA',
+  'NASHVILLE, TN': 'BNA',
+  'NASHVILLE, TENNESSEE': 'BNA',
+  
+  'NEW ORLEANS': 'MSY',
+  'NEW ORLEANS, USA': 'MSY',
+  'NEW ORLEANS, LA': 'MSY',
+  'NEW ORLEANS, LOUISIANA': 'MSY',
+  
+  'TAMPA': 'TPA',
+  'TAMPA, USA': 'TPA',
+  'TAMPA, FL': 'TPA',
+  'TAMPA, FLORIDA': 'TPA',
+  
+  'CHARLOTTE': 'CLT',
+  'CHARLOTTE, USA': 'CLT',
+  'CHARLOTTE, NC': 'CLT',
+  'CHARLOTTE, NORTH CAROLINA': 'CLT',
+  
+  'MINNEAPOLIS': 'MSP',
+  'MINNEAPOLIS, USA': 'MSP',
+  'MINNEAPOLIS, MN': 'MSP',
+  'MINNEAPOLIS, MINNESOTA': 'MSP',
+  
+  'DETROIT': 'DTW',
+  'DETROIT, USA': 'DTW',
+  'DETROIT, MI': 'DTW',
+  'DETROIT, MICHIGAN': 'DTW',
+  
+  'PHILADELPHIA': 'PHL',
+  'PHILADELPHIA, USA': 'PHL',
+  'PHILADELPHIA, PA': 'PHL',
+  'PHILADELPHIA, PENNSYLVANIA': 'PHL',
+  'PHILA': 'PHL',
+  
+  'BALTIMORE': 'BWI',
+  'BALTIMORE, USA': 'BWI',
+  'BALTIMORE, MD': 'BWI',
+  'BALTIMORE, MARYLAND': 'BWI',
+  
+  'PITTSBURGH': 'PIT',
+  'PITTSBURGH, USA': 'PIT',
+  'PITTSBURGH, PA': 'PIT',
+  'PITTSBURGH, PENNSYLVANIA': 'PIT',
+  
+  'CLEVELAND': 'CLE',
+  'CLEVELAND, USA': 'CLE',
+  'CLEVELAND, OH': 'CLE',
+  'CLEVELAND, OHIO': 'CLE',
+  
+  'CINCINNATI': 'CVG',
+  'CINCINNATI, USA': 'CVG',
+  'CINCINNATI, OH': 'CVG',
+  'CINCINNATI, OHIO': 'CVG',
+  
+  'KANSAS CITY': 'MCI',
+  'KANSAS CITY, USA': 'MCI',
+  'KANSAS CITY, MO': 'MCI',
+  'KANSAS CITY, MISSOURI': 'MCI',
+  
+  'ST. LOUIS': 'STL',
+  'ST LOUIS': 'STL',
+  'ST. LOUIS, USA': 'STL',
+  'ST LOUIS, USA': 'STL',
+  'ST. LOUIS, MO': 'STL',
+  'ST LOUIS, MO': 'STL',
+  'ST. LOUIS, MISSOURI': 'STL',
+  
+  'MILWAUKEE': 'MKE',
+  'MILWAUKEE, USA': 'MKE',
+  'MILWAUKEE, WI': 'MKE',
+  'MILWAUKEE, WISCONSIN': 'MKE',
+  
+  'INDIANAPOLIS': 'IND',
+  'INDIANAPOLIS, USA': 'IND',
+  'INDIANAPOLIS, IN': 'IND',
+  'INDIANAPOLIS, INDIANA': 'IND',
+  
+  'COLUMBUS': 'CMH',
+  'COLUMBUS, USA': 'CMH',
+  'COLUMBUS, OH': 'CMH',
+  'COLUMBUS, OHIO': 'CMH',
+  
+  'RALEIGH': 'RDU',
+  'RALEIGH, USA': 'RDU',
+  'RALEIGH, NC': 'RDU',
+  'RALEIGH, NORTH CAROLINA': 'RDU',
+  
+  'SALT LAKE CITY': 'SLC',
+  'SALT LAKE CITY, USA': 'SLC',
+  'SALT LAKE CITY, UT': 'SLC',
+  'SALT LAKE CITY, UTAH': 'SLC',
+  'SLC': 'SLC',
+  
+  'BOISE': 'BOI',
+  'BOISE, USA': 'BOI',
+  'BOISE, ID': 'BOI',
+  'BOISE, IDAHO': 'BOI',
+  
+  'RENO': 'RNO',
+  'RENO, USA': 'RNO',
+  'RENO, NV': 'RNO',
+  'RENO, NEVADA': 'RNO',
+  
+  'TUCSON': 'TUS',
+  'TUCSON, USA': 'TUS',
+  'TUCSON, AZ': 'TUS',
+  'TUCSON, ARIZONA': 'TUS',
+  
+  'ALBUQUERQUE': 'ABQ',
+  'ALBUQUERQUE, USA': 'ABQ',
+  'ALBUQUERQUE, NM': 'ABQ',
+  'ALBUQUERQUE, NEW MEXICO': 'ABQ',
+  
+  'OKLAHOMA CITY': 'OKC',
+  'OKLAHOMA CITY, USA': 'OKC',
+  'OKLAHOMA CITY, OK': 'OKC',
+  'OKLAHOMA CITY, OKLAHOMA': 'OKC',
+  
+  'MEMPHIS': 'MEM',
+  'MEMPHIS, USA': 'MEM',
+  'MEMPHIS, TN': 'MEM',
+  'MEMPHIS, TENNESSEE': 'MEM',
+  
+  'LOUISVILLE': 'SDF',
+  'LOUISVILLE, USA': 'SDF',
+  'LOUISVILLE, KY': 'SDF',
+  'LOUISVILLE, KENTUCKY': 'SDF',
+  
+  'RICHMOND': 'RIC',
+  'RICHMOND, USA': 'RIC',
+  'RICHMOND, VA': 'RIC',
+  'RICHMOND, VIRGINIA': 'RIC',
+  
+  'BUFFALO': 'BUF',
+  'BUFFALO, USA': 'BUF',
+  'BUFFALO, NY': 'BUF',
+  'BUFFALO, NEW YORK': 'BUF',
+  
+  'ROCHESTER': 'ROC',
+  'ROCHESTER, USA': 'ROC',
+  'ROCHESTER, NY': 'ROC',
+  'ROCHESTER, NEW YORK': 'ROC',
+  
+  'HARTFORD': 'BDL',
+  'HARTFORD, USA': 'BDL',
+  'HARTFORD, CT': 'BDL',
+  'HARTFORD, CONNECTICUT': 'BDL',
+  
+  'PROVIDENCE': 'PVD',
+  'PROVIDENCE, USA': 'PVD',
+  'PROVIDENCE, RI': 'PVD',
+  'PROVIDENCE, RHODE ISLAND': 'PVD',
+  
+  'MANCHESTER': 'MHT',
+  'MANCHESTER, USA': 'MHT',
+  'MANCHESTER, NH': 'MHT',
+  'MANCHESTER, NEW HAMPSHIRE': 'MHT',
+  
+  'BURLINGTON': 'BTV',
+  'BURLINGTON, USA': 'BTV',
+  'BURLINGTON, VT': 'BTV',
+  'BURLINGTON, VERMONT': 'BTV',
+  
+  'JACKSONVILLE': 'JAX',
+  'JACKSONVILLE, USA': 'JAX',
+  'JACKSONVILLE, FL': 'JAX',
+  'JACKSONVILLE, FLORIDA': 'JAX',
+  
+  'FORT LAUDERDALE': 'FLL',
+  'FORT LAUDERDALE, USA': 'FLL',
+  'FORT LAUDERDALE, FL': 'FLL',
+  'FORT LAUDERDALE, FLORIDA': 'FLL',
+  
+  'WEST PALM BEACH': 'PBI',
+  'WEST PALM BEACH, USA': 'PBI',
+  'WEST PALM BEACH, FL': 'PBI',
+  'WEST PALM BEACH, FLORIDA': 'PBI',
+  
+  'SARASOTA': 'SRQ',
+  'SARASOTA, USA': 'SRQ',
+  'SARASOTA, FL': 'SRQ',
+  'SARASOTA, FLORIDA': 'SRQ',
+  
+  'FORT MYERS': 'RSW',
+  'FORT MYERS, USA': 'RSW',
+  'FORT MYERS, FL': 'RSW',
+  'FORT MYERS, FLORIDA': 'RSW',
+  
+  'KEY WEST': 'EYW',
+  'KEY WEST, USA': 'EYW',
+  'KEY WEST, FL': 'EYW',
+  'KEY WEST, FLORIDA': 'EYW',
+  
+  'MYRTLE BEACH': 'MYR',
+  'MYRTLE BEACH, USA': 'MYR',
+  'MYRTLE BEACH, SC': 'MYR',
+  'MYRTLE BEACH, SOUTH CAROLINA': 'MYR',
+  
+  'CHARLESTON': 'CHS',
+  'CHARLESTON, USA': 'CHS',
+  'CHARLESTON, SC': 'CHS',
+  'CHARLESTON, SOUTH CAROLINA': 'CHS',
+  
+  'SAVANNAH': 'SAV',
+  'SAVANNAH, USA': 'SAV',
+  'SAVANNAH, GA': 'SAV',
+  'SAVANNAH, GEORGIA': 'SAV',
+  
+  'ASHEVILLE': 'AVL',
+  'ASHEVILLE, USA': 'AVL',
+  'ASHEVILLE, NC': 'AVL',
+  'ASHEVILLE, NORTH CAROLINA': 'AVL',
+  
+  'KNOXVILLE': 'TYS',
+  'KNOXVILLE, USA': 'TYS',
+  'KNOXVILLE, TN': 'TYS',
+  'KNOXVILLE, TENNESSEE': 'TYS',
+  
+  'CHATTANOOGA': 'CHA',
+  'CHATTANOOGA, USA': 'CHA',
+  'CHATTANOOGA, TN': 'CHA',
+  'CHATTANOOGA, TENNESSEE': 'CHA',
+  
+  'BIRMINGHAM': 'BHM',
+  'BIRMINGHAM, USA': 'BHM',
+  'BIRMINGHAM, AL': 'BHM',
+  'BIRMINGHAM, ALABAMA': 'BHM',
+  
+  'MOBILE': 'MOB',
+  'MOBILE, USA': 'MOB',
+  'MOBILE, AL': 'MOB',
+  'MOBILE, ALABAMA': 'MOB',
+  
+  'JACKSON': 'JAN',
+  'JACKSON, USA': 'JAN',
+  'JACKSON, MS': 'JAN',
+  'JACKSON, MISSISSIPPI': 'JAN',
+  
+  'LITTLE ROCK': 'LIT',
+  'LITTLE ROCK, USA': 'LIT',
+  'LITTLE ROCK, AR': 'LIT',
+  'LITTLE ROCK, ARKANSAS': 'LIT',
+  
+  'TULSA': 'TUL',
+  'TULSA, USA': 'TUL',
+  'TULSA, OK': 'TUL',
+  'TULSA, OKLAHOMA': 'TUL',
+  
+  'WICHITA': 'ICT',
+  'WICHITA, USA': 'ICT',
+  'WICHITA, KS': 'ICT',
+  'WICHITA, KANSAS': 'ICT',
+  
+  'OMAHA': 'OMA',
+  'OMAHA, USA': 'OMA',
+  'OMAHA, NE': 'OMA',
+  'OMAHA, NEBRASKA': 'OMA',
+  
+  'DES MOINES': 'DSM',
+  'DES MOINES, USA': 'DSM',
+  'DES MOINES, IA': 'DSM',
+  'DES MOINES, IOWA': 'DSM',
+  
+  'SIOUX FALLS': 'FSD',
+  'SIOUX FALLS, USA': 'FSD',
+  'SIOUX FALLS, SD': 'FSD',
+  'SIOUX FALLS, SOUTH DAKOTA': 'FSD',
+  
+  'FARGO': 'FAR',
+  'FARGO, USA': 'FAR',
+  'FARGO, ND': 'FAR',
+  'FARGO, NORTH DAKOTA': 'FAR',
+  
+  'BILLINGS': 'BIL',
+  'BILLINGS, USA': 'BIL',
+  'BILLINGS, MT': 'BIL',
+  'BILLINGS, MONTANA': 'BIL',
+  
+  'BOZEMAN': 'BZN',
+  'BOZEMAN, USA': 'BZN',
+  'BOZEMAN, MT': 'BZN',
+  'BOZEMAN, MONTANA': 'BZN',
+  
+  'MISSOULA': 'MSO',
+  'MISSOULA, USA': 'MSO',
+  'MISSOULA, MT': 'MSO',
+  'MISSOULA, MONTANA': 'MSO',
+  
+  'SPOKANE': 'GEG',
+  'SPOKANE, USA': 'GEG',
+  'SPOKANE, WA': 'GEG',
+  'SPOKANE, WASHINGTON': 'GEG',
+  
+  'EUGENE': 'EUG',
+  'EUGENE, USA': 'EUG',
+  'EUGENE, OR': 'EUG',
+  'EUGENE, OREGON': 'EUG',
+  
+  'MEDFORD': 'MFR',
+  'MEDFORD, USA': 'MFR',
+  'MEDFORD, OR': 'MFR',
+  'MEDFORD, OREGON': 'MFR',
+  
+  'REDDING': 'RDD',
+  'REDDING, USA': 'RDD',
+  'REDDING, CA': 'RDD',
+  'REDDING, CALIFORNIA': 'RDD',
+  
+  'FRESNO': 'FAT',
+  'FRESNO, USA': 'FAT',
+  'FRESNO, CA': 'FAT',
+  'FRESNO, CALIFORNIA': 'FAT',
+  
+  'BAKERSFIELD': 'BFL',
+  'BAKERSFIELD, USA': 'BFL',
+  'BAKERSFIELD, CA': 'BFL',
+  'BAKERSFIELD, CALIFORNIA': 'BFL',
+  
+  'SANTA BARBARA': 'SBA',
+  'SANTA BARBARA, USA': 'SBA',
+  'SANTA BARBARA, CA': 'SBA',
+  'SANTA BARBARA, CALIFORNIA': 'SBA',
+  
+  'MONTEREY': 'MRY',
+  'MONTEREY, USA': 'MRY',
+  'MONTEREY, CA': 'MRY',
+  'MONTEREY, CALIFORNIA': 'MRY',
+  
+  'PALM SPRINGS': 'PSP',
+  'PALM SPRINGS, USA': 'PSP',
+  'PALM SPRINGS, CA': 'PSP',
+  'PALM SPRINGS, CALIFORNIA': 'PSP',
+  
+  'FLAGSTAFF': 'FLG',
+  'FLAGSTAFF, USA': 'FLG',
+  'FLAGSTAFF, AZ': 'FLG',
+  'FLAGSTAFF, ARIZONA': 'FLG',
+  
+  'GRAND CANYON': 'GCN',
+  'GRAND CANYON, USA': 'GCN',
+  'GRAND CANYON NATIONAL PARK': 'GCN',
+  
+  'SEDONA': 'FLG',
+  'SEDONA, USA': 'FLG',
+  'SEDONA, AZ': 'FLG',
+  
+  'SCOTTSDALE': 'PHX',
+  'SCOTTSDALE, USA': 'PHX',
+  'SCOTTSDALE, AZ': 'PHX',
+  
+  'MESA': 'PHX',
+  'MESA, USA': 'PHX',
+  'MESA, AZ': 'PHX',
+  
+  'CHANDLER': 'PHX',
+  'CHANDLER, USA': 'PHX',
+  'CHANDLER, AZ': 'PHX',
+  
+  'GLENDALE': 'PHX',
+  'GLENDALE, USA': 'PHX',
+  'GLENDALE, AZ': 'PHX',
+  
+  'TEMPE': 'PHX',
+  'TEMPE, USA': 'PHX',
+  'TEMPE, AZ': 'PHX',
+  
+  'GILBERT': 'PHX',
+  'GILBERT, USA': 'PHX',
+  'GILBERT, AZ': 'PHX',
+  
+  'PEORIA': 'PHX',
+  'PEORIA, USA': 'PHX',
+  'PEORIA, AZ': 'PHX',
+  
+  'SURPRISE': 'PHX',
+  'SURPRISE, USA': 'PHX',
+  'SURPRISE, AZ': 'PHX',
+  
+  'AVONDALE': 'PHX',
+  'AVONDALE, USA': 'PHX',
+  'AVONDALE, AZ': 'PHX',
+  
+  'GOODYEAR': 'PHX',
+  'GOODYEAR, USA': 'PHX',
+  'GOODYEAR, AZ': 'PHX',
+  
+  'BUCKEYE': 'PHX',
+  'BUCKEYE, USA': 'PHX',
+  'BUCKEYE, AZ': 'PHX',
+  
+  'EL MIRAGE': 'PHX',
+  'EL MIRAGE, USA': 'PHX',
+  'EL MIRAGE, AZ': 'PHX',
+  
+  'YOUNGTOWN': 'PHX',
+  'YOUNGTOWN, USA': 'PHX',
+  'YOUNGTOWN, AZ': 'PHX',
+  
+  'SUN CITY': 'PHX',
+  'SUN CITY, USA': 'PHX',
+  'SUN CITY, AZ': 'PHX',
+  
+  'SUN CITY WEST': 'PHX',
+  'SUN CITY WEST, USA': 'PHX',
+  'SUN CITY WEST, AZ': 'PHX',
+  
+  'FOUNTAIN HILLS': 'PHX',
+  'FOUNTAIN HILLS, USA': 'PHX',
+  'FOUNTAIN HILLS, AZ': 'PHX',
+  
+  'PARADISE VALLEY': 'PHX',
+  'PARADISE VALLEY, USA': 'PHX',
+  'PARADISE VALLEY, AZ': 'PHX',
+  
+  'CAVE CREEK': 'PHX',
+  'CAVE CREEK, USA': 'PHX',
+  'CAVE CREEK, AZ': 'PHX',
+  
+  'CAREFREE': 'PHX',
+  'CAREFREE, USA': 'PHX',
+  'CAREFREE, AZ': 'PHX',
+  
+  'NEW RIVER': 'PHX',
+  'NEW RIVER, USA': 'PHX',
+  'NEW RIVER, AZ': 'PHX',
+  
+  'ANTHEM': 'PHX',
+  'ANTHEM, USA': 'PHX',
+  'ANTHEM, AZ': 'PHX',
+  
+  'DESERT HILLS': 'PHX',
+  'DESERT HILLS, USA': 'PHX',
+  'DESERT HILLS, AZ': 'PHX',
+  
+  'BLACK CANYON CITY': 'PHX',
+  'BLACK CANYON CITY, USA': 'PHX',
+  'BLACK CANYON CITY, AZ': 'PHX',
+  
+  'CORDES LAKES': 'PRC',
+  'CORDES LAKES, USA': 'PRC',
+  'CORDES LAKES, AZ': 'PRC',
+  
+  'MAYER': 'PRC',
+  'MAYER, USA': 'PRC',
+  'MAYER, AZ': 'PRC',
+  
+  'DEWEY-HUMBOLDT': 'PRC',
+  'DEWEY-HUMBOLDT, USA': 'PRC',
+  'DEWEY-HUMBOLDT, AZ': 'PRC',
+  
+  'PRESCOTT': 'PRC',
+  'PRESCOTT, USA': 'PRC',
+  'PRESCOTT, AZ': 'PRC',
+  'PRESCOTT, ARIZONA': 'PRC',
+  
+  'PRESCOTT VALLEY': 'PRC',
+  'PRESCOTT VALLEY, USA': 'PRC',
+  'PRESCOTT VALLEY, AZ': 'PRC',
+  
+  'CHINO VALLEY': 'PRC',
+  'CHINO VALLEY, USA': 'PRC',
+  'CHINO VALLEY, AZ': 'PRC',
+  
+  'CAMP VERDE': 'FLG',
+  'CAMP VERDE, USA': 'FLG',
+  'CAMP VERDE, AZ': 'FLG',
+  
+  'COTTONWOOD': 'PRC',
+  'COTTONWOOD, USA': 'PRC',
+  'COTTONWOOD, AZ': 'PRC',
+  
+  'CLARKDALE': 'PRC',
+  'CLARKDALE, USA': 'PRC',
+  'CLARKDALE, AZ': 'PRC',
+  
+  'JEROME': 'PRC',
+  'JEROME, USA': 'PRC',
+  'JEROME, AZ': 'PRC',
+  
+  'OAK CREEK': 'FLG',
+  'OAK CREEK, USA': 'FLG',
+  'OAK CREEK, AZ': 'FLG',
+  
+  'VILLAGE OF OAK CREEK': 'FLG',
+  'VILLAGE OF OAK CREEK, USA': 'FLG',
+  
+  'CORNVILLE': 'FLG',
+  'CORNVILLE, USA': 'FLG',
+  'CORNVILLE, AZ': 'FLG',
+  
+  'RIMROCK': 'FLG',
+  'RIMROCK, USA': 'FLG',
+  'RIMROCK, AZ': 'FLG',
+  
+  'MCGUIREVILLE': 'FLG',
+  'MCGUIREVILLE, USA': 'FLG',
+  'MCGUIREVILLE, AZ': 'FLG',
+  
+  'LAKE MONTEZUMA': 'FLG',
+  'LAKE MONTEZUMA, USA': 'FLG',
+  'LAKE MONTEZUMA, AZ': 'FLG',
+  
+  'RINCON': 'TUS',
+  'RINCON, USA': 'TUS',
+  'RINCON, AZ': 'TUS',
+  
+  'PAYSON': 'PHX',
+  'PAYSON, USA': 'PHX',
+  'PAYSON, AZ': 'PHX',
+  
+  'PINE': 'PHX',
+  'PINE, USA': 'PHX',
+  'PINE, AZ': 'PHX',
+  
+  'STRAWBERRY': 'PHX',
+  'STRAWBERRY, USA': 'PHX',
+  'STRAWBERRY, AZ': 'PHX',
+  
+  'YOUNG': 'PHX',
+  'YOUNG, USA': 'PHX',
+  'YOUNG, AZ': 'PHX',
+  
+  'CHRISTOPHER CREEK': 'PHX',
+  'CHRISTOPHER CREEK, USA': 'PHX',
+  'CHRISTOPHER CREEK, AZ': 'PHX',
+  
+  'HEBER-OVERGAARD': 'FLG',
+  'HEBER-OVERGAARD, USA': 'FLG',
+  'HEBER-OVERGAARD, AZ': 'FLG',
+  
+  'PINETOP-LAKESIDE': 'PHX',
+  'PINETOP-LAKESIDE, USA': 'PHX',
+  'PINETOP-LAKESIDE, AZ': 'PHX',
+  
+  'SHOW LOW': 'PHX',
+  'SHOW LOW, USA': 'PHX',
+  'SHOW LOW, AZ': 'PHX',
+  
+  'SNOWFLAKE': 'PHX',
+  'SNOWFLAKE, USA': 'PHX',
+  'SNOWFLAKE, AZ': 'PHX',
+  
+  'TAYLOR': 'PHX',
+  'TAYLOR, USA': 'PHX',
+  'TAYLOR, AZ': 'PHX',
+  
+  'WINSLOW': 'FLG',
+  'WINSLOW, USA': 'FLG',
+  'WINSLOW, AZ': 'FLG',
+  
+  'HOLBROOK': 'FLG',
+  'HOLBROOK, USA': 'FLG',
+  'HOLBROOK, AZ': 'FLG',
+  
+  'JOSEPH CITY': 'FLG',
+  'JOSEPH CITY, USA': 'FLG',
+  'JOSEPH CITY, AZ': 'FLG',
+  
+  'SUN VALLEY': 'SUN',
+  'SUN VALLEY, USA': 'SUN',
+  'SUN VALLEY, ID': 'SUN',
+  'SUN VALLEY, IDAHO': 'SUN',
+  
+  'NAVAJO': 'FLG',
+  'NAVAJO, USA': 'FLG',
+  'NAVAJO, AZ': 'FLG',
+  
+  'CHAMBERS': 'FLG',
+  'CHAMBERS, USA': 'FLG',
+  'CHAMBERS, AZ': 'FLG',
+  
+  'LUPTON': 'FLG',
+  'LUPTON, USA': 'FLG',
+  'LUPTON, AZ': 'FLG',
+  
+  'SANDERS': 'FLG',
+  'SANDERS, USA': 'FLG',
+  'SANDERS, AZ': 'FLG',
+  
+  'HOUCK': 'FLG',
+  'HOUCK, USA': 'FLG',
+  'HOUCK, AZ': 'FLG',
+  
+  'ST. JOHNS': 'PHX',
+  'ST JOHNS': 'PHX',
+  'ST. JOHNS, USA': 'PHX',
+  'ST JOHNS, USA': 'PHX',
+  'ST. JOHNS, AZ': 'PHX',
+  
+  'SPRINGERVILLE': 'PHX',
+  'SPRINGERVILLE, USA': 'PHX',
+  'SPRINGERVILLE, AZ': 'PHX',
+  
+  'EAGAR': 'PHX',
+  'EAGAR, USA': 'PHX',
+  'EAGAR, AZ': 'PHX',
+  
+  'NUTRIOSO': 'PHX',
+  'NUTRIOSO, USA': 'PHX',
+  'NUTRIOSO, AZ': 'PHX',
+  
+  'ALPINE': 'PHX',
+  'ALPINE, USA': 'PHX',
+  'ALPINE, AZ': 'PHX',
+  
+  'GREER': 'PHX',
+  'GREER, USA': 'PHX',
+  'GREER, AZ': 'PHX',
+  
+  'MCNARY': 'PHX',
+  'MCNARY, USA': 'PHX',
+  'MCNARY, AZ': 'PHX',
+  
+  'FORT APACHE': 'PHX',
+  'FORT APACHE, USA': 'PHX',
+  'FORT APACHE, AZ': 'PHX',
+  
+  'WHITERIVER': 'PHX',
+  'WHITERIVER, USA': 'PHX',
+  'WHITERIVER, AZ': 'PHX',
+  
+  'CIBECUE': 'PHX',
+  'CIBECUE, USA': 'PHX',
+  'CIBECUE, AZ': 'PHX',
+  
+  'CARRIZO': 'PHX',
+  'CARRIZO, USA': 'PHX',
+  'CARRIZO, AZ': 'PHX',
+  
+  'HON-DAH': 'PHX',
+  'HON-DAH, USA': 'PHX',
+  'HON-DAH, AZ': 'PHX',
+  
+  'PINETOP': 'PHX',
+  'PINETOP, USA': 'PHX',
+  'PINETOP, AZ': 'PHX',
+  
+  'LAKESIDE': 'PHX',
+  'LAKESIDE, USA': 'PHX',
+  'LAKESIDE, AZ': 'PHX',
+  
+  'VERNON': 'PHX',
+  'VERNON, USA': 'PHX',
+  'VERNON, AZ': 'PHX',
+  
+  'CONCHO': 'PHX',
+  'CONCHO, USA': 'PHX',
+  'CONCHO, AZ': 'PHX',
+
+  // ===========================================
+  // 🇨🇦 Canada - Principal Airports
+  // ===========================================
+  'TORONTO': 'YYZ',
+  'TORONTO, CANADA': 'YYZ',
+  'TORONTO, CA': 'YYZ',
+  'CANADA': 'YYZ',
+  
+  'VANCOUVER': 'YVR',
+  'VANCOUVER, CANADA': 'YVR',
+  'VANCOUVER, CA': 'YVR',
+  
+  'MONTREAL': 'YUL',
+  'MONTREAL, CANADA': 'YUL',
+  'MONTREAL, CA': 'YUL',
+  
+  'CALGARY': 'YYC',
+  'CALGARY, CANADA': 'YYC',
+  'CALGARY, CA': 'YYC',
+  
+  'EDMONTON': 'YEG',
+  'EDMONTON, CANADA': 'YEG',
+  'EDMONTON, CA': 'YEG',
+  
+  'OTTAWA': 'YOW',
+  'OTTAWA, CANADA': 'YOW',
+  'OTTAWA, CA': 'YOW',
+  
+  'WINNIPEG': 'YWG',
+  'WINNIPEG, CANADA': 'YWG',
+  'WINNIPEG, CA': 'YWG',
+  
+  'QUEBEC CITY': 'YQB',
+  'QUEBEC CITY, CANADA': 'YQB',
+  'QUEBEC CITY, CA': 'YQB',
+  
+  'HAMILTON': 'YHM',
+  'HAMILTON, CANADA': 'YHM',
+  'HAMILTON, CA': 'YHM',
+  
+  'KITCHENER': 'YKF',
+  'KITCHENER, CANADA': 'YKF',
+  'KITCHENER, CA': 'YKF',
+  
+  'LONDON': 'YXU',
+  'LONDON, CANADA': 'YXU',
+  'LONDON, CA': 'YXU',
+  
+  'VICTORIA': 'YYJ',
+  'VICTORIA, CANADA': 'YYJ',
+  'VICTORIA, CA': 'YYJ',
+  
+  'HALIFAX': 'YHZ',
+  'HALIFAX, CANADA': 'YHZ',
+  'HALIFAX, CA': 'YHZ',
+  
+  'OSHAWA': 'YOO',
+  'OSHAWA, CANADA': 'YOO',
+  
+  'WINDSOR': 'YQG',
+  'WINDSOR, CANADA': 'YQG',
+  
+  'SASKATOON': 'YXE',
+  'SASKATOON, CANADA': 'YXE',
+  
+  'REGINA': 'YQR',
+  'REGINA, CANADA': 'YQR',
+  
+  'ST. JOHN\'S': 'YYT',
+  'ST JOHNS': 'YYT',
+  'ST. JOHN\'S, CANADA': 'YYT',
+  
+  'BARRIE': 'YBR',
+  'BARRIE, CANADA': 'YBR',
+  
+  'KELOWNA': 'YLW',
+  'KELOWNA, CANADA': 'YLW',
+  
+  'ABBOTSFORD': 'YXX',
+  'ABBOTSFORD, CANADA': 'YXX',
+  
+  'KINGSTON': 'YGK',
+  'KINGSTON, CANADA': 'YGK',
+  
+  'SUDBURY': 'YSB',
+  'SUDBURY, CANADA': 'YSB',
+  
+  'SHERBROOKE': 'YSC',
+  'SHERBROOKE, CANADA': 'YSC',
+  
+  'SAGUENAY': 'YBG',
+  'SAGUENAY, CANADA': 'YBG',
+  
+  'LEVIS': 'YQB',
+  'LÉVIS, CANADA': 'YQB',
+  
+  'TROIS-RIVIÈRES': 'YRQ',
+  'TROIS-RIVIERES': 'YRQ',
+  'TROIS-RIVIÈRES, CANADA': 'YRQ',
+  
+  'TERREBONNE': 'YUL',
+  'TERREBONNE, CANADA': 'YUL',
+  
+  'SAINT-JEAN-SUR-RICHELIEU': 'YUL',
+  'SAINT-JEAN-SUR-RICHELIEU, CANADA': 'YUL',
+  
+  'REPENTIGNY': 'YUL',
+  'REPENTIGNY, CANADA': 'YUL',
+  
+  'BROSSARD': 'YUL',
+  'BROSSARD, CANADA': 'YUL',
+  
+  'DRUMMONDVILLE': 'YUL',
+  'DRUMMONDVILLE, CANADA': 'YUL',
+  
+  'SAINT-JÉRÔME': 'YUL',
+  'SAINT-JEROME': 'YUL',
+  'SAINT-JÉRÔME, CANADA': 'YUL',
+  
+  'GRANBY': 'YUL',
+  'GRANBY, CANADA': 'YUL',
+  
+  'BLAINVILLE': 'YUL',
+  'BLAINVILLE, CANADA': 'YUL',
+  
+  'SAINT-HYACINTHE': 'YUL',
+  'SAINT-HYACINTHE, CANADA': 'YUL',
+  
+  'SHAWINIGAN': 'YQC',
+  'SHAWINIGAN, CANADA': 'YQC',
+  
+  'DOLLARD-DES-ORMEAUX': 'YUL',
+  'DOLLARD-DES-ORMEAUX, CANADA': 'YUL',
+  
+  'BRANDON': 'YBR',
+  'BRANDON, CANADA': 'YBR',
+  
+  'RED DEER': 'YQF',
+  'RED DEER, CANADA': 'YQF',
+  
+  'LETHBRIDGE': 'YQL',
+  'LETHBRIDGE, CANADA': 'YQL',
+  
+  'KAMLOOPS': 'YKA',
+  'KAMLOOPS, CANADA': 'YKA',
+  
+  'NANAIMO': 'YCD',
+  'NANAIMO, CANADA': 'YCD',
+  
+  'PRINCE GEORGE': 'YXS',
+  'PRINCE GEORGE, CANADA': 'YXS',
+  
+  'CHILLIWACK': 'YCW',
+  'CHILLIWACK, CANADA': 'YCW',
+  
+  'VERNON': 'YVE',
+  'VERNON, CANADA': 'YVE',
+  
+  'PENTICTON': 'YYF',
+  'PENTICTON, CANADA': 'YYF',
+  
+  'CAMPBELL RIVER': 'YBL',
+  'CAMPBELL RIVER, CANADA': 'YBL',
+  
+  'COURTENAY': 'YCA',
+  'COURTENAY, CANADA': 'YCA',
+  
+  'CRANBROOK': 'YXC',
+  'CRANBROOK, CANADA': 'YXC',
+  
+  'FORT ST. JOHN': 'YXJ',
+  'FORT ST JOHN': 'YXJ',
+  'FORT ST. JOHN, CANADA': 'YXJ',
+  
+  'DAWSON CREEK': 'YDQ',
+  'DAWSON CREEK, CANADA': 'YDQ',
+  
+  'TERRACE': 'YXT',
+  'TERRACE, CANADA': 'YXT',
+  
+  'PRINCE RUPERT': 'YPR',
+  'PRINCE RUPERT, CANADA': 'YPR',
+  
+  'WHITEHORSE': 'YXY',
+  'WHITEHORSE, CANADA': 'YXY',
+  
+  'YELLOWKNIFE': 'YZF',
+  'YELLOWKNIFE, CANADA': 'YZF',
+  
+  'IQALUIT': 'YFB',
+  'IQALUIT, CANADA': 'YFB',
+
   // ===========================================
   // 🇪🇺 Europa - Principal Airports
   // ===========================================
@@ -223,6 +1085,533 @@ const AIRPORT_CODES = {
   'BUCHAREST, ROMANIA': 'OTP',
   'BUCHAREST, RO': 'OTP',
   
+  'SOFIA': 'SOF',
+  'SOFIA, BULGARIA': 'SOF',
+  'SOFIA, BG': 'SOF',
+  
+  'ZAGREB': 'ZAG',
+  'ZAGREB, CROATIA': 'ZAG',
+  'ZAGREB, HR': 'ZAG',
+  
+  'LJUBLJANA': 'LJU',
+  'LJUBLJANA, SLOVENIA': 'LJU',
+  'LJUBLJANA, SI': 'LJU',
+  
+  'BRATISLAVA': 'BTS',
+  'BRATISLAVA, SLOVAKIA': 'BTS',
+  'BRATISLAVA, SK': 'BTS',
+  
+  'TALLINN': 'TLL',
+  'TALLINN, ESTONIA': 'TLL',
+  'TALLINN, EE': 'TLL',
+  
+  'RIGA': 'RIX',
+  'RIGA, LATVIA': 'RIX',
+  'RIGA, LV': 'RIX',
+  
+  'VILNIUS': 'VNO',
+  'VILNIUS, LITHUANIA': 'VNO',
+  'VILNIUS, LT': 'VNO',
+  
+  'REYKJAVIK': 'KEF',
+  'REYKJAVIK, ICELAND': 'KEF',
+  'REYKJAVIK, IS': 'KEF',
+  'ICELAND': 'KEF',
+  
+  'LUXEMBOURG': 'LUX',
+  'LUXEMBOURG, LUXEMBOURG': 'LUX',
+  'LUXEMBOURG, LU': 'LUX',
+  
+  'VALLETTA': 'MLA',
+  'VALLETTA, MALTA': 'MLA',
+  'MALTA': 'MLA',
+  
+  'NICOSIA': 'LCA',
+  'NICOSIA, CYPRUS': 'LCA',
+  'CYPRUS': 'LCA',
+  
+  'MONACO': 'NCE',
+  'MONACO, MONACO': 'NCE',
+  
+  'SAN MARINO': 'RMI',
+  'SAN MARINO, SAN MARINO': 'RMI',
+  
+  'VATICAN CITY': 'FCO',
+  'VATICAN CITY, VATICAN CITY': 'FCO',
+  
+  'ANDORRA LA VELLA': 'BCN',
+  'ANDORRA LA VELLA, ANDORRA': 'BCN',
+  
+  'LIECHTENSTEIN': 'ZRH',
+  'LIECHTENSTEIN, LIECHTENSTEIN': 'ZRH',
+  
+  'GIBRALTAR': 'GIB',
+  'GIBRALTAR, GIBRALTAR': 'GIB',
+  
+  'BELFAST': 'BFS',
+  'BELFAST, UK': 'BFS',
+  'BELFAST, NORTHERN IRELAND': 'BFS',
+  
+  'CARDIFF': 'CWL',
+  'CARDIFF, UK': 'CWL',
+  'CARDIFF, WALES': 'CWL',
+  
+  'GLASGOW': 'GLA',
+  'GLASGOW, UK': 'GLA',
+  'GLASGOW, SCOTLAND': 'GLA',
+  
+  'LIVERPOOL': 'LPL',
+  'LIVERPOOL, UK': 'LPL',
+  'LIVERPOOL, ENGLAND': 'LPL',
+  
+  'NEWCASTLE': 'NCL',
+  'NEWCASTLE, UK': 'NCL',
+  'NEWCASTLE, ENGLAND': 'NCL',
+  
+  'LEEDS': 'LBA',
+  'LEEDS, UK': 'LBA',
+  'LEEDS, ENGLAND': 'LBA',
+  
+  'SHEFFIELD': 'MAN',
+  'SHEFFIELD, UK': 'MAN',
+  'SHEFFIELD, ENGLAND': 'MAN',
+  
+  'NOTTINGHAM': 'EMA',
+  'NOTTINGHAM, UK': 'EMA',
+  'NOTTINGHAM, ENGLAND': 'EMA',
+  
+  'LEICESTER': 'EMA',
+  'LEICESTER, UK': 'EMA',
+  'LEICESTER, ENGLAND': 'EMA',
+  
+  'COVENTRY': 'BHX',
+  'COVENTRY, UK': 'BHX',
+  'COVENTRY, ENGLAND': 'BHX',
+  
+  'BRADFORD': 'LBA',
+  'BRADFORD, UK': 'LBA',
+  'BRADFORD, ENGLAND': 'LBA',
+  
+  'STOKE-ON-TRENT': 'MAN',
+  'STOKE-ON-TRENT, UK': 'MAN',
+  
+  'WOLVERHAMPTON': 'BHX',
+  'WOLVERHAMPTON, UK': 'BHX',
+  
+  'PLYMOUTH': 'PLH',
+  'PLYMOUTH, UK': 'PLH',
+  
+  'SOUTHAMPTON': 'SOU',
+  'SOUTHAMPTON, UK': 'SOU',
+  
+  'READING': 'LHR',
+  'READING, UK': 'LHR',
+  
+  'DERBY': 'EMA',
+  'DERBY, UK': 'EMA',
+  
+  'PORTSMOUTH': 'SOU',
+  'PORTSMOUTH, UK': 'SOU',
+  
+  'YORK': 'LBA',
+  'YORK, UK': 'LBA',
+  
+  'PETERBOROUGH': 'STN',
+  'PETERBOROUGH, UK': 'STN',
+  
+  'CAMBRIDGE': 'STN',
+  'CAMBRIDGE, UK': 'STN',
+  
+  'OXFORD': 'LHR',
+  'OXFORD, UK': 'LHR',
+  
+  'BRIGHTON': 'LGW',
+  'BRIGHTON, UK': 'LGW',
+  
+  'BOURNEMOUTH': 'BOH',
+  'BOURNEMOUTH, UK': 'BOH',
+  
+  'SWINDON': 'LHR',
+  'SWINDON, UK': 'LHR',
+  
+  'NORTHAMPTON': 'BHX',
+  'NORTHAMPTON, UK': 'BHX',
+  
+  'NORWICH': 'NWI',
+  'NORWICH, UK': 'NWI',
+  
+  'LUTON': 'LTN',
+  'LUTON, UK': 'LTN',
+  
+  'MILTON KEYNES': 'LHR',
+  'MILTON KEYNES, UK': 'LHR',
+  
+  'SLOUGH': 'LHR',
+  'SLOUGH, UK': 'LHR',
+  
+  'GLOUCESTER': 'BHX',
+  'GLOUCESTER, UK': 'BHX',
+  
+  'EXETER': 'EXT',
+  'EXETER, UK': 'EXT',
+  
+  'BATH': 'BRS',
+  'BATH, UK': 'BRS',
+  
+  'CHESTER': 'MAN',
+  'CHESTER, UK': 'MAN',
+  
+  'CANTERBURY': 'LGW',
+  'CANTERBURY, UK': 'LGW',
+  
+  'SALISBURY': 'SOU',
+  'SALISBURY, UK': 'SOU',
+  
+  'WINCHESTER': 'SOU',
+  'WINCHESTER, UK': 'SOU',
+  
+  'CHICHESTER': 'LGW',
+  'CHICHESTER, UK': 'LGW',
+  
+  'WELLS': 'BRS',
+  'WELLS, UK': 'BRS',
+  
+  'TRURO': 'NQY',
+  'TRURO, UK': 'NQY',
+  
+  'ST. DAVIDS': 'CWL',
+  'ST. DAVIDS, UK': 'CWL',
+  
+  'BANGOR': 'LPL',
+  'BANGOR, UK': 'LPL',
+  
+  'ARMAGH': 'BFS',
+  'ARMAGH, UK': 'BFS',
+  
+  'LONDONDERRY': 'LDY',
+  'LONDONDERRY, UK': 'LDY',
+  
+  'LYON': 'LYS',
+  'LYON, FRANCE': 'LYS',
+  'LYON, FR': 'LYS',
+  
+  'MARSEILLE': 'MRS',
+  'MARSEILLE, FRANCE': 'MRS',
+  'MARSEILLE, FR': 'MRS',
+  
+  'TOULOUSE': 'TLS',
+  'TOULOUSE, FRANCE': 'TLS',
+  'TOULOUSE, FR': 'TLS',
+  
+  'NICE': 'NCE',
+  'NICE, FRANCE': 'NCE',
+  'NICE, FR': 'NCE',
+  
+  'NANTES': 'NTE',
+  'NANTES, FRANCE': 'NTE',
+  'NANTES, FR': 'NTE',
+  
+  'STRASBOURG': 'SXB',
+  'STRASBOURG, FRANCE': 'SXB',
+  'STRASBOURG, FR': 'SXB',
+  
+  'MONTPELLIER': 'MPL',
+  'MONTPELLIER, FRANCE': 'MPL',
+  'MONTPELLIER, FR': 'MPL',
+  
+  'BORDEAUX': 'BOD',
+  'BORDEAUX, FRANCE': 'BOD',
+  'BORDEAUX, FR': 'BOD',
+  
+  'LILLE': 'LIL',
+  'LILLE, FRANCE': 'LIL',
+  'LILLE, FR': 'LIL',
+  
+  'RENNES': 'RNS',
+  'RENNES, FRANCE': 'RNS',
+  'RENNES, FR': 'RNS',
+  
+  'REIMS': 'RHE',
+  'REIMS, FRANCE': 'RHE',
+  'REIMS, FR': 'RHE',
+  
+  'LE HAVRE': 'LEH',
+  'LE HAVRE, FRANCE': 'LEH',
+  'LE HAVRE, FR': 'LEH',
+  
+  'SAINT-ÉTIENNE': 'EBU',
+  'SAINT-ETIENNE': 'EBU',
+  'SAINT-ÉTIENNE, FRANCE': 'EBU',
+  
+  'TOULON': 'TLN',
+  'TOULON, FRANCE': 'TLN',
+  'TOULON, FR': 'TLN',
+  
+  'GRENOBLE': 'GNB',
+  'GRENOBLE, FRANCE': 'GNB',
+  'GRENOBLE, FR': 'GNB',
+  
+  'DIJON': 'DIJ',
+  'DIJON, FRANCE': 'DIJ',
+  'DIJON, FR': 'DIJ',
+  
+  'ANGERS': 'ANE',
+  'ANGERS, FRANCE': 'ANE',
+  
+  'NÎMES': 'FNI',
+  'NIMES': 'FNI',
+  'NÎMES, FRANCE': 'FNI',
+  
+  'VILLEURBANNE': 'LYS',
+  'VILLEURBANNE, FRANCE': 'LYS',
+  
+  'LE MANS': 'LME',
+  'LE MANS, FRANCE': 'LME',
+  
+  'AIX-EN-PROVENCE': 'MRS',
+  'AIX-EN-PROVENCE, FRANCE': 'MRS',
+  
+  'CLERMONT-FERRAND': 'CFE',
+  'CLERMONT-FERRAND, FRANCE': 'CFE',
+  
+  'BREST': 'BES',
+  'BREST, FRANCE': 'BES',
+  
+  'TOURS': 'TUF',
+  'TOURS, FRANCE': 'TUF',
+  
+  'AMIENS': 'BVA',
+  'AMIENS, FRANCE': 'BVA',
+  
+  'LIMOGES': 'LIG',
+  'LIMOGES, FRANCE': 'LIG',
+  
+  'ANNECY': 'GVA',
+  'ANNECY, FRANCE': 'GVA',
+  
+  'PERPIGNAN': 'PGF',
+  'PERPIGNAN, FRANCE': 'PGF',
+  
+  'BOULOGNE-BILLANCOURT': 'ORY',
+  'BOULOGNE-BILLANCOURT, FRANCE': 'ORY',
+  
+  'METZ': 'ETZ',
+  'METZ, FRANCE': 'ETZ',
+  
+  'BESANÇON': 'BSL',
+  'BESANCON': 'BSL',
+  'BESANÇON, FRANCE': 'BSL',
+  
+  'ORLÉANS': 'ORY',
+  'ORLEANS': 'ORY',
+  'ORLÉANS, FRANCE': 'ORY',
+  
+  'MULHOUSE': 'BSL',
+  'MULHOUSE, FRANCE': 'BSL',
+  
+  'ROUEN': 'URO',
+  'ROUEN, FRANCE': 'URO',
+  
+  'CAEN': 'CFR',
+  'CAEN, FRANCE': 'CFR',
+  
+  'NANCY': 'ETZ',
+  'NANCY, FRANCE': 'ETZ',
+  
+  'ARGENTEUIL': 'CDG',
+  'ARGENTEUIL, FRANCE': 'CDG',
+  
+  'MONTREUIL': 'CDG',
+  'MONTREUIL, FRANCE': 'CDG',
+  
+  'SAINT-DENIS': 'CDG',
+  'SAINT-DENIS, FRANCE': 'CDG',
+  
+  'ROUBAIX': 'LIL',
+  'ROUBAIX, FRANCE': 'LIL',
+  
+  'TOURCOING': 'LIL',
+  'TOURCOING, FRANCE': 'LIL',
+  
+  'NANTERRE': 'CDG',
+  'NANTERRE, FRANCE': 'CDG',
+  
+  'AVIGNON': 'AVN',
+  'AVIGNON, FRANCE': 'AVN',
+  
+  'CRÉTEIL': 'ORY',
+  'CRETEIL': 'ORY',
+  'CRÉTEIL, FRANCE': 'ORY',
+  
+  'DUNKERQUE': 'LIL',
+  'DUNKERQUE, FRANCE': 'LIL',
+  
+  'POITIERS': 'PIS',
+  'POITIERS, FRANCE': 'PIS',
+  
+  'AULNAY-SOUS-BOIS': 'CDG',
+  'AULNAY-SOUS-BOIS, FRANCE': 'CDG',
+  
+  'SAINT-PIERRE': 'RUN',
+  'SAINT-PIERRE, FRANCE': 'RUN',
+  
+  'RUEIL-MALMAISON': 'ORY',
+  'RUEIL-MALMAISON, FRANCE': 'ORY',
+  
+  'PAU': 'PUF',
+  'PAU, FRANCE': 'PUF',
+  
+  'AUBERVILLIERS': 'CDG',
+  'AUBERVILLIERS, FRANCE': 'CDG',
+  
+  'LE TAMPON': 'RUN',
+  'LE TAMPON, FRANCE': 'RUN',
+  
+  'CHAMPIGNY-SUR-MARNE': 'ORY',
+  'CHAMPIGNY-SUR-MARNE, FRANCE': 'ORY',
+  
+  'ANTIBES': 'NCE',
+  'ANTIBES, FRANCE': 'NCE',
+  
+  'LA ROCHELLE': 'LRH',
+  'LA ROCHELLE, FRANCE': 'LRH',
+  
+  'CANNES': 'CEQ',
+  'CANNES, FRANCE': 'CEQ',
+  
+  'CALAIS': 'CQF',
+  'CALAIS, FRANCE': 'CQF',
+  
+  'SAINT-MAUR-DES-FOSSÉS': 'ORY',
+  'SAINT-MAUR-DES-FOSSES': 'ORY',
+  'SAINT-MAUR-DES-FOSSÉS, FRANCE': 'ORY',
+  
+  'BOURGES': 'BOU',
+  'BOURGES, FRANCE': 'BOU',
+  
+  'DRANCY': 'CDG',
+  'DRANCY, FRANCE': 'CDG',
+  
+  'AJACCIO': 'AJA',
+  'AJACCIO, FRANCE': 'AJA',
+  
+  'COLMAR': 'EAP',
+  'COLMAR, FRANCE': 'EAP',
+  
+  'MÉRIGNAC': 'BOD',
+  'MERIGNAC': 'BOD',
+  'MÉRIGNAC, FRANCE': 'BOD',
+  
+  'SAINT-NAZAIRE': 'NTE',
+  'SAINT-NAZAIRE, FRANCE': 'NTE',
+  
+  'VALENCE': 'VAF',
+  'VALENCE, FRANCE': 'VAF',
+  
+  'ISSY-LES-MOULINEAUX': 'ORY',
+  'ISSY-LES-MOULINEAUX, FRANCE': 'ORY',
+  
+  'LEVALLOIS-PERRET': 'CDG',
+  'LEVALLOIS-PERRET, FRANCE': 'CDG',
+  
+  'QUIMPER': 'UIP',
+  'QUIMPER, FRANCE': 'UIP',
+  
+  'LA SEYNE-SUR-MER': 'TLN',
+  'LA SEYNE-SUR-MER, FRANCE': 'TLN',
+  
+  'ANTONY': 'ORY',
+  'ANTONY, FRANCE': 'ORY',
+  
+  'TROYES': 'QYR',
+  'TROYES, FRANCE': 'QYR',
+  
+  'NEUILLY-SUR-SEINE': 'CDG',
+  'NEUILLY-SUR-SEINE, FRANCE': 'CDG',
+  
+  'SARCELLES': 'CDG',
+  'SARCELLES, FRANCE': 'CDG',
+  
+  'LES ABYMES': 'PTP',
+  'LES ABYMES, FRANCE': 'PTP',
+  
+  'VÉNISSIEUX': 'LYS',
+  'VENISSIEUX': 'LYS',
+  'VÉNISSIEUX, FRANCE': 'LYS',
+  
+  'CLICHY': 'CDG',
+  'CLICHY, FRANCE': 'CDG',
+  
+  'LORIENT': 'LRT',
+  'LORIENT, FRANCE': 'LRT',
+  
+  'PESSAC': 'BOD',
+  'PESSAC, FRANCE': 'BOD',
+  
+  'IVRY-SUR-SEINE': 'ORY',
+  'IVRY-SUR-SEINE, FRANCE': 'ORY',
+  
+  'CERGY': 'CDG',
+  'CERGY, FRANCE': 'CDG',
+  
+  'CAYENNE': 'CAY',
+  'CAYENNE, FRANCE': 'CAY',
+  
+  'NIORT': 'NIT',
+  'NIORT, FRANCE': 'NIT',
+  
+  'CHAMBÉRY': 'CMF',
+  'CHAMBERY': 'CMF',
+  'CHAMBÉRY, FRANCE': 'CMF',
+  
+  'MONTAUBAN': 'TLS',
+  'MONTAUBAN, FRANCE': 'TLS',
+  
+  'SAINT-QUENTIN': 'SFX',
+  'SAINT-QUENTIN, FRANCE': 'SFX',
+  
+  'VILLEJUIF': 'ORY',
+  'VILLEJUIF, FRANCE': 'ORY',
+  
+  'HYÈRES': 'TLN',
+  'HYERES': 'TLN',
+  'HYÈRES, FRANCE': 'TLN',
+  
+  'BEAUVAIS': 'BVA',
+  'BEAUVAIS, FRANCE': 'BVA',
+  
+  'CHOLET': 'NTE',
+  'CHOLET, FRANCE': 'NTE',
+  
+  'VANNES': 'VNE',
+  'VANNES, FRANCE': 'VNE',
+  
+  'LA ROCHE-SUR-YON': 'EDM',
+  'LA ROCHE-SUR-YON, FRANCE': 'EDM',
+  
+  'ÉVRY': 'ORY',
+  'EVRY': 'ORY',
+  'ÉVRY, FRANCE': 'ORY',
+  
+  'ARLES': 'MRS',
+  'ARLES, FRANCE': 'MRS',
+  
+  'NARBONNE': 'BZR',
+  'NARBONNE, FRANCE': 'BZR',
+  
+  'GRASSE': 'NCE',
+  'GRASSE, FRANCE': 'NCE',
+  
+  'CHÂLONS-EN-CHAMPAGNE': 'XCR',
+  'CHALONS-EN-CHAMPAGNE': 'XCR',
+  'CHÂLONS-EN-CHAMPAGNE, FRANCE': 'XCR',
+  
+  'LE LAMENTIN': 'FDF',
+  'LE LAMENTIN, FRANCE': 'FDF',
+  
+  'NOISY-LE-GRAND': 'CDG',
+  'NOISY-LE-GRAND, FRANCE': 'CDG',
+
   // ===========================================
   // 🌏 Asia - Principal Airports
   // ===========================================
@@ -356,43 +1745,317 @@ const AIRPORT_CODES = {
   'MALE, MALDIVES': 'MLE',
   'MALDIVES': 'MLE',
   
+  'SIEM REAP': 'REP',
+  'SIEM REAP, CAMBODIA': 'REP',
+  
+  'LUANG PRABANG': 'LPQ',
+  'LUANG PRABANG, LAOS': 'LPQ',
+  
+  'YANGON': 'RGN',
+  'YANGON, MYANMAR': 'RGN',
+  
+  'DHAKA': 'DAC',
+  'DHAKA, BANGLADESH': 'DAC',
+  
+  'ISLAMABAD': 'ISB',
+  'ISLAMABAD, PAKISTAN': 'ISB',
+  
+  'KARACHI': 'KHI',
+  'KARACHI, PAKISTAN': 'KHI',
+  
+  'LAHORE': 'LHE',
+  'LAHORE, PAKISTAN': 'LHE',
+  
+  'KABUL': 'KBL',
+  'KABUL, AFGHANISTAN': 'KBL',
+  
+  'TASHKENT': 'TAS',
+  'TASHKENT, UZBEKISTAN': 'TAS',
+  'TASHKENT, UZ': 'TAS',
+  'UZBEKISTAN': 'TAS',
+  
+  'ALMATY': 'ALA',
+  'ALMATY, KAZAKHSTAN': 'ALA',
+  'ALMATY, KZ': 'ALA',
+  'KAZAKHSTAN': 'ALA',
+  
+  'BISHKEK': 'FRU',
+  'BISHKEK, KYRGYZSTAN': 'FRU',
+  
+  'DUSHANBE': 'DYU',
+  'DUSHANBE, TAJIKISTAN': 'DYU',
+  
+  'ASHGABAT': 'ASB',
+  'ASHGABAT, TURKMENISTAN': 'ASB',
+  
+  'YEREVAN': 'EVN',
+  'YEREVAN, ARMENIA': 'EVN',
+  'YEREVAN, AM': 'EVN',
+  'ARMENIA': 'EVN',
+  
+  'TBILISI': 'TBS',
+  'TBILISI, GEORGIA': 'TBS',
+  'TBILISI, GE': 'TBS',
+  'GEORGIA': 'TBS',
+  
+  'BAKU': 'GYD',
+  'BAKU, AZERBAIJAN': 'GYD',
+  'BAKU, AZ': 'GYD',
+  'AZERBAIJAN': 'GYD',
+  
+  'TEHRAN': 'IKA',
+  'TEHRAN, IRAN': 'IKA',
+  
+  'BAGHDAD': 'BGW',
+  'BAGHDAD, IRAQ': 'BGW',
+  
+  'AMMAN': 'AMM',
+  'AMMAN, JORDAN': 'AMM',
+  'AMMAN, JO': 'AMM',
+  'JORDAN': 'AMM',
+  
+  'BEIRUT': 'BEY',
+  'BEIRUT, LEBANON': 'BEY',
+  'BEIRUT, LB': 'BEY',
+  'LEBANON': 'BEY',
+  
+  'DAMASCUS': 'DAM',
+  'DAMASCUS, SYRIA': 'DAM',
+  
+  'KUWAIT CITY': 'KWI',
+  'KUWAIT CITY, KUWAIT': 'KWI',
+  
+  'MANAMA': 'BAH',
+  'MANAMA, BAHRAIN': 'BAH',
+  
+  'DOHA': 'DOH',
+  'DOHA, QATAR': 'DOH',
+  'DOHA, QA': 'DOH',
+  'QATAR': 'DOH',
+  
+  'ABU DHABI': 'AUH',
+  'ABU DHABI, UAE': 'AUH',
+  'ABU DHABI, UNITED ARAB EMIRATES': 'AUH',
+  
+  'DUBAI': 'DXB',
+  'DUBAI, UAE': 'DXB',
+  'DUBAI, UNITED ARAB EMIRATES': 'DXB',
+  'UAE': 'DXB',
+  'UNITED ARAB EMIRATES': 'DXB',
+  
+  'MUSCAT': 'MCT',
+  'MUSCAT, OMAN': 'MCT',
+  
+  'SANA\'A': 'SAH',
+  'SANAA': 'SAH',
+  'SANA\'A, YEMEN': 'SAH',
+  
+  'RIYADH': 'RUH',
+  'RIYADH, SAUDI ARABIA': 'RUH',
+  'RIYADH, SA': 'RUH',
+  'SAUDI ARABIA': 'RUH',
+  
+  'JEDDAH': 'JED',
+  'JEDDAH, SAUDI ARABIA': 'JED',
+  'JEDDAH, SA': 'JED',
+  
+  'MECCA': 'JED',
+  'MECCA, SAUDI ARABIA': 'JED',
+  
+  'MEDINA': 'MED',
+  'MEDINA, SAUDI ARABIA': 'MED',
+  
+  'DAMMAM': 'DMM',
+  'DAMMAM, SAUDI ARABIA': 'DMM',
+  
+  'TABUK': 'TUU',
+  'TABUK, SAUDI ARABIA': 'TUU',
+  
+  'TAIF': 'TIF',
+  'TAIF, SAUDI ARABIA': 'TIF',
+  
+  'KHAMIS MUSHAIT': 'AHB',
+  'KHAMIS MUSHAIT, SAUDI ARABIA': 'AHB',
+  
+  'HAIL': 'HAS',
+  'HAIL, SAUDI ARABIA': 'HAS',
+  
+  'NAJRAN': 'EAM',
+  'NAJRAN, SAUDI ARABIA': 'EAM',
+  
+  'JIZAN': 'GIZ',
+  'JIZAN, SAUDI ARABIA': 'GIZ',
+  'AL BAH': 'ABT',
+  'AL BAH, SAUDI ARABIA': 'ABT',
+  
   // ===========================================
-  // 🌎 Americas (Non-USA) - Principal Airports
+  // 🌏 Asia - Additional Cities
   // ===========================================
-  'TORONTO': 'YYZ',
-  'TORONTO, CANADA': 'YYZ',
-  'TORONTO, CA': 'YYZ',
-  'CANADA': 'YYZ',
+  'KOH SAMUI': 'USM',
+  'KOH SAMUI, THAILAND': 'USM',
   
-  'VANCOUVER': 'YVR',
-  'VANCOUVER, CANADA': 'YVR',
-  'VANCOUVER, CA': 'YVR',
+  'KRABI': 'KBV',
+  'KRABI, THAILAND': 'KBV',
   
-  'MONTREAL': 'YUL',
-  'MONTREAL, CANADA': 'YUL',
-  'MONTREAL, CA': 'YUL',
+  'LANGKAWI': 'LGK',
+  'LANGKAWI, MALAYSIA': 'LGK',
   
-  'CALGARY': 'YYC',
-  'CALGARY, CANADA': 'YYC',
-  'CALGARY, CA': 'YYC',
+  'PENANG': 'PEN',
+  'PENANG, MALAYSIA': 'PEN',
   
-  'MEXICO CITY': 'MEX',
-  'MEXICO CITY, MEXICO': 'MEX',
-  'MEXICO CITY, MX': 'MEX',
-  'CIUDAD DE MEXICO': 'MEX',
-  'CDMX': 'MEX',
-  'MEXICO': 'MEX',
+  'BORACAY': 'MPH',
+  'BORACAY, PHILIPPINES': 'MPH',
   
-  'TIJUANA': 'TIJ',
-  'TIJUANA, MEXICO': 'TIJ',
-  'TIJUANA, MX': 'TIJ',
+  'PALAWAN': 'PPS',
+  'PALAWAN, PHILIPPINES': 'PPS',
   
-  'CANCUN': 'CUN',
-  'CANCUN, MEXICO': 'CUN',
-  'CANCUN, MX': 'CUN',
-  'RIVIERA MAYA': 'CUN',
-  'PLAYA DEL CARMEN': 'CUN',
+  'EL NIDO': 'ENI',
+  'EL NIDO, PHILIPPINES': 'ENI',
   
+  'CORON': 'USU',
+  'CORON, PHILIPPINES': 'USU',
+  
+  'SIARGAO': 'IAO',
+  'SIARGAO, PHILIPPINES': 'IAO',
+  
+  'BOHOL': 'TAG',
+  'BOHOL, PHILIPPINES': 'TAG',
+  
+  'SIQUIJOR': 'SGQ',
+  'SIQUIJOR, PHILIPPINES': 'SGQ',
+  
+  'CAMIGUIN': 'CGM',
+  'CAMIGUIN, PHILIPPINES': 'CGM',
+  
+  'ROMBLON': 'TBH',
+  'ROMBLON, PHILIPPINES': 'TBH',
+  
+  'MARINDUQUE': 'MRQ',
+  'MARINDUQUE, PHILIPPINES': 'MRQ',
+  
+  'MINDORO': 'MBO',
+  'MINDORO, PHILIPPINES': 'MBO',
+  
+  'LUZON': 'MNL',
+  'LUZON, PHILIPPINES': 'MNL',
+  
+  'VISAYAS': 'CEB',
+  'VISAYAS, PHILIPPINES': 'CEB',
+  
+  'MINDANAO': 'DVO',
+  'MINDANAO, PHILIPPINES': 'DVO',
+  
+  'BANTAYAN ISLAND': 'BNU',
+  'BANTAYAN ISLAND, PHILIPPINES': 'BNU',
+  
+  'MALAPASCUA': 'CEB',
+  'MALAPASCUA, PHILIPPINES': 'CEB',
+  
+  'APO ISLAND': 'DGT',
+  'APO ISLAND, PHILIPPINES': 'DGT',
+  
+  'DUMAGUETE': 'DGT',
+  'DUMAGUETE, PHILIPPINES': 'DGT',
+  
+  'NEGROS': 'BCD',
+  'NEGROS, PHILIPPINES': 'BCD',
+  
+  'PANAY': 'ILO',
+  'PANAY, PHILIPPINES': 'ILO',
+  
+  'GUIMARAS': 'ILO',
+  'GUIMARAS, PHILIPPINES': 'ILO',
+  
+  'MASBATE': 'MBT',
+  'MASBATE, PHILIPPINES': 'MBT',
+  
+  'SAMAR': 'TAC',
+  'SAMAR, PHILIPPINES': 'TAC',
+  
+  'LEYTE': 'TAC',
+  'LEYTE, PHILIPPINES': 'TAC',
+  
+  'BILIRAN': 'TAC',
+  'BILIRAN, PHILIPPINES': 'TAC',
+  
+  'CALICOAN ISLAND': 'TAC',
+  'CALICOAN ISLAND, PHILIPPINES': 'TAC',
+  
+  'HOMONHON ISLAND': 'TAC',
+  'HOMONHON ISLAND, PHILIPPINES': 'TAC',
+  
+  'DINAGAT ISLANDS': 'DGT',
+  'DINAGAT ISLANDS, PHILIPPINES': 'DGT',
+  
+  'SURIGAO': 'SUG',
+  'SURIGAO, PHILIPPINES': 'SUG',
+  
+  'BUCAS GRANDE': 'SUG',
+  'BUCAS GRANDE, PHILIPPINES': 'SUG',
+  
+  'SOCORRO': 'SUG',
+  'SOCORRO, PHILIPPINES': 'SUG',
+  
+  'GENERAL LUNA': 'SUG',
+  'GENERAL LUNA, PHILIPPINES': 'SUG',
+  
+  'DEL CARMEN': 'SUG',
+  'DEL CARMEN, PHILIPPINES': 'SUG',
+  
+  'SANTA MONICA': 'SUG',
+  'SANTA MONICA, PHILIPPINES': 'SUG',
+  
+  'SAN BENITO': 'SUG',
+  'SAN BENITO, PHILIPPINES': 'SUG',
+  
+  'PILAR': 'SUG',
+  'PILAR, PHILIPPINES': 'SUG',
+  
+  'SAN ISIDRO': 'SUG',
+  'SAN ISIDRO, PHILIPPINES': 'SUG',
+  
+  'DAPA': 'SUG',
+  'DAPA, PHILIPPINES': 'SUG',
+  
+  'CLAVER': 'SUG',
+  'CLAVER, PHILIPPINES': 'SUG',
+  
+  'PLACER': 'SUG',
+  'PLACER, PHILIPPINES': 'SUG',
+  
+  'SISON': 'SUG',
+  'SISON, PHILIPPINES': 'SUG',
+  
+  'TAGANA-AN': 'SUG',
+  'TAGANA-AN, PHILIPPINES': 'SUG',
+  
+  'TUBOD': 'SUG',
+  'TUBOD, PHILIPPINES': 'SUG',
+  
+  'MAINIT': 'SUG',
+  'MAINIT, PHILIPPINES': 'SUG',
+  
+  'MALIMONO': 'SUG',
+  'MALIMONO, PHILIPPINES': 'SUG',
+  
+  'SAN FRANCISCO': 'SUG',
+  'SAN FRANCISCO, PHILIPPINES': 'SUG',
+  
+  'ANAO-AON': 'SUG',
+  'ANAO-AON, PHILIPPINES': 'SUG',
+  
+  'SAN JOSE': 'SJI',
+  'SAN JOSE, PHILIPPINES': 'SJI',
+  
+  'LORETO': 'SUG',
+  'LORETO, PHILIPPINES': 'SUG',
+  
+  'BURGOS': 'SUG',
+  'BURGOS, PHILIPPINES': 'SUG',
+
+  // ===========================================
+  // 🌎 Americas (Non-USA/Canada) - Additional Cities
+  // ===========================================
   'GUADALAJARA': 'GDL',
   'GUADALAJARA, MEXICO': 'GDL',
   'GUADALAJARA, MX': 'GDL',
@@ -408,15 +2071,87 @@ const AIRPORT_CODES = {
   'CABO SAN LUCAS, MEXICO': 'SJD',
   'LOS CABOS': 'SJD',
   
-  'SAO PAULO': 'GRU',
-  'SAO PAULO, BRAZIL': 'GRU',
-  'SAO PAULO, BR': 'GRU',
-  'BRAZIL': 'GRU',
+  'MERIDA': 'MID',
+  'MERIDA, MEXICO': 'MID',
+  
+  'OAXACA': 'OAX',
+  'OAXACA, MEXICO': 'OAX',
+  
+  'PUEBLA': 'PBC',
+  'PUEBLA, MEXICO': 'PBC',
+  
+  'SAN MIGUEL DE ALLENDE': 'BJX',
+  'SAN MIGUEL DE ALLENDE, MEXICO': 'BJX',
+  
+  'GUANAJUATO': 'BJX',
+  'GUANAJUATO, MEXICO': 'BJX',
+  
+  'MORELIA': 'MLM',
+  'MORELIA, MEXICO': 'MLM',
+  
+  'ACAPULCO': 'ACA',
+  'ACAPULCO, MEXICO': 'ACA',
+  
+  'MAZATLAN': 'MZT',
+  'MAZATLAN, MEXICO': 'MZT',
+  
+  'LA PAZ': 'LAP',
+  'LA PAZ, MEXICO': 'LAP',
+  
+  'ENSENADA': 'TIJ',
+  'ENSENADA, MEXICO': 'TIJ',
+  
+  'ROSARITO': 'TIJ',
+  'ROSARITO, MEXICO': 'TIJ',
+  
+  'SAN JOSE DEL CABO': 'SJD',
+  'SAN JOSE DEL CABO, MEXICO': 'SJD',
+  
+  'TODOS SANTOS': 'SJD',
+  'TODOS SANTOS, MEXICO': 'SJD',
+  
+  'LORETO': 'LTO',
+  'LORETO, MEXICO': 'LTO',
+  
+  'MULEGE': 'GUB',
+  'MULEGE, MEXICO': 'GUB',
+  
+  'GUERRERO NEGRO': 'GUB',
+  'GUERRERO NEGRO, MEXICO': 'GUB',
+  
+  'SANTA ROSALIA': 'GUB',
+  'SANTA ROSALIA, MEXICO': 'GUB',
+  
+  'SAN IGNACIO': 'GUB',
+  'SAN IGNACIO, MEXICO': 'GUB',
+  
+  'CIUDAD CONSTITUCION': 'LAP',
+  'CIUDAD CONSTITUCION, MEXICO': 'LAP',
+  
+  'LA VENTANA': 'LAP',
+  'LA VENTANA, MEXICO': 'LAP',
+  
+  'LOS BARRILES': 'LAP',
+  'LOS BARRILES, MEXICO': 'LAP',
+  
+  'BUENA VISTA': 'LAP',
+  'BUENA VISTA, MEXICO': 'LAP',
+  
+  'MIRAFLORES': 'LAP',
+  'MIRAFLORES, MEXICO': 'LAP',
+  
+  'SANTIAGO': 'SJD',
+  'SANTIAGO, MEXICO': 'SJD',
   
   'RIO DE JANEIRO': 'GIG',
   'RIO DE JANEIRO, BRAZIL': 'GIG',
   'RIO DE JANEIRO, BR': 'GIG',
   'RIO': 'GIG',
+  
+  'SAO PAULO': 'GRU',
+  'SAO PAULO, BRAZIL': 'GRU',
+  'SAO PAULO, BR': 'GRU',
+  'BRAZIL': 'GRU',
   
   'BUENOS AIRES': 'EZE',
   'BUENOS AIRES, ARGENTINA': 'EZE',
@@ -515,33 +2250,199 @@ const AIRPORT_CODES = {
   'NASSAU, BAHAMAS': 'NAS',
   'BAHAMAS': 'NAS',
   
+  'PORT OF SPAIN': 'POS',
+  'PORT OF SPAIN, TRINIDAD AND TOBAGO': 'POS',
+  
+  'BRIDGETOWN': 'BGI',
+  'BRIDGETOWN, BARBADOS': 'BGI',
+  
+  'CASTRIES': 'SLU',
+  'CASTRIES, SAINT LUCIA': 'SLU',
+  
+  'ST. GEORGE\'S': 'GND',
+  'ST GEORGE\'S': 'GND',
+  'ST. GEORGE\'S, GRENADA': 'GND',
+  
+  'KINGSTOWN': 'SVD',
+  'KINGSTOWN, SAINT VINCENT AND THE GRENADINES': 'SVD',
+  
+  'ROAD TOWN': 'EIS',
+  'ROAD TOWN, BRITISH VIRGIN ISLANDS': 'EIS',
+  
+  'CHARLOTTE AMALIE': 'STT',
+  'CHARLOTTE AMALIE, US VIRGIN ISLANDS': 'STT',
+  
+  'SAN JUAN': 'SJU',
+  'SAN JUAN, PUERTO RICO': 'SJU',
+  
+  'PONCE': 'PSE',
+  'PONCE, PUERTO RICO': 'PSE',
+  
+  'MAYAGUEZ': 'MAZ',
+  'MAYAGUEZ, PUERTO RICO': 'MAZ',
+  
+  'ARECIBO': 'ARE',
+  'ARECIBO, PUERTO RICO': 'ARE',
+  
+  'CAGUAS': 'CGU',
+  'CAGUAS, PUERTO RICO': 'CGU',
+  
+  'BAYAMON': 'SJU',
+  'BAYAMON, PUERTO RICO': 'SJU',
+  
+  'CAROLINA': 'SJU',
+  'CAROLINA, PUERTO RICO': 'SJU',
+  
+  'GUAYNABO': 'SJU',
+  'GUAYNABO, PUERTO RICO': 'SJU',
+  
+  'TOA BAJA': 'SJU',
+  'TOA BAJA, PUERTO RICO': 'SJU',
+  
+  'DORADO': 'SJU',
+  'DORADO, PUERTO RICO': 'SJU',
+  
+  'VEGA BAJA': 'SJU',
+  'VEGA BAJA, PUERTO RICO': 'SJU',
+  
+  'MANATI': 'SJU',
+  'MANATI, PUERTO RICO': 'SJU',
+  
+  'BARCELONETA': 'SJU',
+  'BARCELONETA, PUERTO RICO': 'SJU',
+  
+  'FLORIDA': 'SJU',
+  'FLORIDA, PUERTO RICO': 'SJU',
+  
+  'CIALES': 'SJU',
+  'CIALES, PUERTO RICO': 'SJU',
+  
+  'MOROVIS': 'SJU',
+  'MOROVIS, PUERTO RICO': 'SJU',
+  
+  'COROZAL': 'SJU',
+  'COROZAL, PUERTO RICO': 'SJU',
+  
+  'NARANJITO': 'SJU',
+  'NARANJITO, PUERTO RICO': 'SJU',
+  
+  'TOA ALTA': 'SJU',
+  'TOA ALTA, PUERTO RICO': 'SJU',
+  
+  'CANOVANAS': 'SJU',
+  'CANOVANAS, PUERTO RICO': 'SJU',
+  
+  'LOIZA': 'SJU',
+  'LOIZA, PUERTO RICO': 'SJU',
+  
+  'RIO GRANDE': 'SJU',
+  'RIO GRANDE, PUERTO RICO': 'SJU',
+  
+  'LUQUILLO': 'SJU',
+  'LUQUILLO, PUERTO RICO': 'SJU',
+  
+  'FAJARDO': 'FAJ',
+  'FAJARDO, PUERTO RICO': 'FAJ',
+  
+  'CEIBA': 'FAJ',
+  'CEIBA, PUERTO RICO': 'FAJ',
+  
+  'NAGUABO': 'FAJ',
+  'NAGUABO, PUERTO RICO': 'FAJ',
+  
+  'HUMACAO': 'HUC',
+  'HUMACAO, PUERTO RICO': 'HUC',
+  
+  'YABUCOA': 'HUC',
+  'YABUCOA, PUERTO RICO': 'HUC',
+  
+  'MAUNABO': 'HUC',
+  'MAUNABO, PUERTO RICO': 'HUC',
+  
+  'PATILLAS': 'HUC',
+  'PATILLAS, PUERTO RICO': 'HUC',
+  
+  'ARROYO': 'HUC',
+  'ARROYO, PUERTO RICO': 'HUC',
+  
+  'GUAYAMA': 'HUC',
+  'GUAYAMA, PUERTO RICO': 'HUC',
+  
+  'SALINAS': 'HUC',
+  'SALINAS, PUERTO RICO': 'HUC',
+  
+  'SANTA ISABEL': 'HUC',
+  'SANTA ISABEL, PUERTO RICO': 'HUC',
+  
+  'JUANA DIAZ': 'HUC',
+  'JUANA DIAZ, PUERTO RICO': 'HUC',
+  
+  'PENUelas': 'HUC',
+  'PENUelas, PUERTO RICO': 'HUC',
+  
+  'ADJUNTAS': 'HUC',
+  'ADJUNTAS, PUERTO RICO': 'HUC',
+  
+  'UTUADO': 'HUC',
+  'UTUADO, PUERTO RICO': 'HUC',
+  
+  'LARES': 'HUC',
+  'LARES, PUERTO RICO': 'HUC',
+  
+  'MARICAO': 'HUC',
+  'MARICAO, PUERTO RICO': 'HUC',
+  
+  'SAN GERMAN': 'HUC',
+  'SAN GERMAN, PUERTO RICO': 'HUC',
+  
+  'SABANA GRANDE': 'HUC',
+  'SABANA GRANDE, PUERTO RICO': 'HUC',
+  
+  'YAUCO': 'HUC',
+  'YAUCO, PUERTO RICO': 'HUC',
+  
+  'GUANICA': 'HUC',
+  'GUANICA, PUERTO RICO': 'HUC',
+  
+  'LAJAS': 'HUC',
+  'LAJAS, PUERTO RICO': 'HUC',
+  
+  'CABO ROJO': 'HUC',
+  'CABO ROJO, PUERTO RICO': 'HUC',
+  
+  'HORMIGUEROS': 'HUC',
+  'HORMIGUEROS, PUERTO RICO': 'HUC',
+  
+  'ANASCO': 'HUC',
+  'ANASCO, PUERTO RICO': 'HUC',
+  
+  'RINCON': 'HUC',
+  'RINCON, PUERTO RICO': 'HUC',
+  
+  'AGUADA': 'HUC',
+  'AGUADA, PUERTO RICO': 'HUC',
+  
+  'AGUADILLA': 'BQN',
+  'AGUADILLA, PUERTO RICO': 'BQN',
+  
+  'MOCA': 'BQN',
+  'MOCA, PUERTO RICO': 'BQN',
+  
+  'ISABELA': 'BQN',
+  'ISABELA, PUERTO RICO': 'BQN',
+  
+  'QUEBRADILLAS': 'BQN',
+  'QUEBRADILLAS, PUERTO RICO': 'BQN',
+  
+  'CAMUY': 'BQN',
+  'CAMUY, PUERTO RICO': 'BQN',
+  
+  'HATILLO': 'BQN',
+  'HATILLO, PUERTO RICO': 'BQN',
+
   // ===========================================
-  // 🌍 Africa & Middle East - Principal Airports
+  // 🌍 Africa & Middle East - Additional Cities
   // ===========================================
-  'DUBAI': 'DXB',
-  'DUBAI, UAE': 'DXB',
-  'DUBAI, UNITED ARAB EMIRATES': 'DXB',
-  'UAE': 'DXB',
-  'UNITED ARAB EMIRATES': 'DXB',
-  
-  'ABU DHABI': 'AUH',
-  'ABU DHABI, UAE': 'AUH',
-  'ABU DHABI, UNITED ARAB EMIRATES': 'AUH',
-  
-  'DOHA': 'DOH',
-  'DOHA, QATAR': 'DOH',
-  'DOHA, QA': 'DOH',
-  'QATAR': 'DOH',
-  
-  'RIYADH': 'RUH',
-  'RIYADH, SAUDI ARABIA': 'RUH',
-  'RIYADH, SA': 'RUH',
-  'SAUDI ARABIA': 'RUH',
-  
-  'JEDDAH': 'JED',
-  'JEDDAH, SAUDI ARABIA': 'JED',
-  'JEDDAH, SA': 'JED',
-  
   'CAIRO': 'CAI',
   'CAIRO, EGYPT': 'CAI',
   'CAIRO, EG': 'CAI',
@@ -599,8 +2500,53 @@ const AIRPORT_CODES = {
   'DAKAR, SN': 'DSS',
   'SENEGAL': 'DSS',
   
+  'DAR ES SALAAM': 'DAR',
+  'DAR ES SALAAM, TANZANIA': 'DAR',
+  
+  'ZANZIBAR': 'ZNZ',
+  'ZANZIBAR, TANZANIA': 'ZNZ',
+  'STONE TOWN': 'ZNZ',
+  
+  'KIGALI': 'KGL',
+  'KIGALI, RWANDA': 'KGL',
+  
+  'KAMPALA': 'EBB',
+  'KAMPALA, UGANDA': 'EBB',
+  
+  'LUSAKA': 'LUN',
+  'LUSAKA, ZAMBIA': 'LUN',
+  
+  'HARARE': 'HRE',
+  'HARARE, ZIMBABWE': 'HRE',
+  
+  'GABORONE': 'GBE',
+  'GABORONE, BOTSWANA': 'GBE',
+  
+  'WINDHOEK': 'WDH',
+  'WINDHOEK, NAMIBIA': 'WDH',
+  
+  'MAPUTO': 'MPM',
+  'MAPUTO, MOZAMBIQUE': 'MPM',
+  
+  'ANTANANARIVO': 'TNR',
+  'ANTANANARIVO, MADAGASCAR': 'TNR',
+  
+  'PORT LOUIS': 'MRU',
+  'PORT LOUIS, MAURITIUS': 'MRU',
+  
+  'VICTORIA': 'SEZ',
+  'VICTORIA, SEYCHELLES': 'SEZ',
+  
+  'TEL AVIV': 'TLV',
+  'TEL AVIV, ISRAEL': 'TLV',
+  'TEL AVIV, IL': 'TLV',
+  'ISRAEL': 'TLV',
+  
+  'JERUSALEM': 'TLV',
+  'JERUSALEM, ISRAEL': 'TLV',
+
   // ===========================================
-  // 🌏 Oceania - Principal Airports
+  // 🌏 Oceania - Additional Cities
   // ===========================================
   'SYDNEY': 'SYD',
   'SYDNEY, AUSTRALIA': 'SYD',
@@ -653,75 +2599,109 @@ const AIRPORT_CODES = {
   'NADI': 'NAN',
   'NADI, FIJI': 'NAN',
   
+  'BORA BORA': 'BOB',
+  'BORA BORA, FRENCH POLYNESIA': 'BOB',
+  
+  'TAHITI': 'PPT',
+  'PAPEETE': 'PPT',
+  'PAPEETE, FRENCH POLYNESIA': 'PPT',
+  
+  'MOOREA': 'PPT',
+  'MOOREA, FRENCH POLYNESIA': 'PPT',
+  
+  'RAROTONGA': 'RAR',
+  'RAROTONGA, COOK ISLANDS': 'RAR',
+  
+  'AITUTAKI': 'AIT',
+  'AITUTAKI, COOK ISLANDS': 'AIT',
+  
+  'NUKU\'ALOF': 'TBU',
+  'NUKU ALOFA': 'TBU',
+  'NUKU\'ALOFA, TONGA': 'TBU',
+  
+  'APIA': 'APW',
+  'APIA, SAMOA': 'APW',
+  
+  'PORT VILA': 'VLI',
+  'PORT VILA, VANUATU': 'VLI',
+  
+  'HONIARA': 'HIR',
+  'HONIARA, SOLOMON ISLANDS': 'HIR',
+  
+  'PORT MORESBY': 'POM',
+  'PORT MORESBY, PAPUA NEW GUINEA': 'POM',
+  
+  'LAUTOKA': 'LTK',
+  'LAUTOKA, FIJI': 'LTK',
+  
+  'SUVA': 'SUV',
+  'SUVA, FIJI': 'SUV',
+  
+  'DENARAU': 'NAN',
+  'DENARAU, FIJI': 'NAN',
+  
+  'CORAL COAST': 'NAN',
+  'CORAL COAST, FIJI': 'NAN',
+  
+  'PACIFIC HARBOUR': 'SUV',
+  'PACIFIC HARBOUR, FIJI': 'SUV',
+  
+  'BEQA': 'SUV',
+  'BEQA, FIJI': 'SUV',
+  
+  'KADAVU': 'KDV',
+  'KADAVU, FIJI': 'KDV',
+  
+  'TAVEUNI': 'TVU',
+  'TAVEUNI, FIJI': 'TVU',
+  
+  'VANUA LEVU': 'LBS',
+  'VANUA LEVU, FIJI': 'LBS',
+  
+  'SAVUSAVU': 'SVU',
+  'SAVUSAVU, FIJI': 'SVU',
+  
+  'LABASA': 'LBS',
+  'LABASA, FIJI': 'LBS',
+  
+  'YASAWA ISLANDS': 'NAN',
+  'YASAWA ISLANDS, FIJI': 'NAN',
+  
+  'MAMANUCA ISLANDS': 'NAN',
+  'MAMANUCA ISLANDS, FIJI': 'NAN',
+  
+  'CASTAWAY ISLAND': 'NAN',
+  'CASTAWAY ISLAND, FIJI': 'NAN',
+  
+  'TOKORIKI': 'NAN',
+  'TOKORIKI, FIJI': 'NAN',
+  
+  'MONURIKI': 'NAN',
+  'MONURIKI, FIJI': 'NAN',
+  
+  'MANA ISLAND': 'MNF',
+  'MANA ISLAND, FIJI': 'MNF',
+  
+  'TREASURE ISLAND': 'NAN',
+  'TREASURE ISLAND, FIJI': 'NAN',
+  
+  'BEACHCOMBER': 'NAN',
+  'BEACHCOMBER, FIJI': 'NAN',
+  
+  'SOUTH SEA ISLAND': 'NAN',
+  'SOUTH SEA ISLAND, FIJI': 'NAN',
+  
+  'PLANTATION ISLAND': 'NAN',
+  'PLANTATION ISLAND, FIJI': 'NAN',
+  
+  'LIKULIKU LAGOON RESORT': 'NAN',
+  'LIKULIKU LAGOON RESORT, FIJI': 'NAN',
+  
+  'MATAMANO': 'NAN',
+  'MATAMANO, FIJI': 'NAN',
+
   // ===========================================
-  // 🌍 Other Popular Destinations
-  // ===========================================
-  'REYKJAVIK': 'KEF',
-  'REYKJAVIK, ICELAND': 'KEF',
-  'REYKJAVIK, IS': 'KEF',
-  'ICELAND': 'KEF',
-  
-  'LUXEMBOURG': 'LUX',
-  'LUXEMBOURG, LUXEMBOURG': 'LUX',
-  'LUXEMBOURG, LU': 'LUX',
-  
-  'MALTA': 'MLA',
-  'VALLETTA': 'MLA',
-  'VALLETTA, MALTA': 'MLA',
-  
-  'CYPRUS': 'LCA',
-  'LARNACA': 'LCA',
-  'LARNACA, CYPRUS': 'LCA',
-  
-  'TEL AVIV': 'TLV',
-  'TEL AVIV, ISRAEL': 'TLV',
-  'TEL AVIV, IL': 'TLV',
-  'ISRAEL': 'TLV',
-  
-  'JERUSALEM': 'TLV',
-  'JERUSALEM, ISRAEL': 'TLV',
-  
-  'BEIRUT': 'BEY',
-  'BEIRUT, LEBANON': 'BEY',
-  'BEIRUT, LB': 'BEY',
-  'LEBANON': 'BEY',
-  
-  'AMMAN': 'AMM',
-  'AMMAN, JORDAN': 'AMM',
-  'AMMAN, JO': 'AMM',
-  'JORDAN': 'AMM',
-  
-  'PETRA': 'AQJ',
-  'PETRA, JORDAN': 'AQJ',
-  'AQABA': 'AQJ',
-  
-  'TASHKENT': 'TAS',
-  'TASHKENT, UZBEKISTAN': 'TAS',
-  'TASHKENT, UZ': 'TAS',
-  'UZBEKISTAN': 'TAS',
-  
-  'ALMATY': 'ALA',
-  'ALMATY, KAZAKHSTAN': 'ALA',
-  'ALMATY, KZ': 'ALA',
-  'KAZAKHSTAN': 'ALA',
-  
-  'TBILISI': 'TBS',
-  'TBILISI, GEORGIA': 'TBS',
-  'TBILISI, GE': 'TBS',
-  'GEORGIA': 'TBS',
-  
-  'YEREVAN': 'EVN',
-  'YEREVAN, ARMENIA': 'EVN',
-  'YEREVAN, AM': 'EVN',
-  'ARMENIA': 'EVN',
-  
-  'BAKU': 'GYD',
-  'BAKU, AZERBAIJAN': 'GYD',
-  'BAKU, AZ': 'GYD',
-  'AZERBAIJAN': 'GYD',
-  
-  // ===========================================
-  // 🏝️ Island & Resort Destinations
+  // 🏝️ Popular Island Destinations
   // ===========================================
   'MALDIVES': 'MLE',
   'MALE, MALDIVES': 'MLE',

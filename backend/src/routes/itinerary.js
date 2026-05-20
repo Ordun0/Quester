@@ -14,4 +14,7 @@ router.use(authMiddleware);
 router.post('/generate', itineraryController.generateItinerary);
 console.log('✅ Route registered: POST /generate');
 
+router.post('/regenerate', itineraryController.regenerateItinerary);
+console.log('✅ Route registered: POST /regenerate');
+
 module.exports = router;

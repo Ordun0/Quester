@@ -1,5 +1,3 @@
-// frontend/src/components/trip-builder/Step3Preferences.jsx
-
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -7,7 +5,7 @@ import { preferencesSchema } from '../../utils/validators';
 import { useNavigate } from 'react-router-dom';
 
 // ✅ URL del backend para desarrollo (ajustar según tu configuración)
-const API_BASE_URL = import.meta?.env?.VITE_API_URL || 'http://localhost:3000';
+const API_BASE_URL = import.meta?.env?.VITE_AWS_BACKEND_URL || 'http://100.48.137.197:3000/api';
 
 function Step3Preferences({ tripData, updateTripData, onValid, onBack }) {
   const navigate = useNavigate();
@@ -20,21 +18,22 @@ function Step3Preferences({ tripData, updateTripData, onValid, onBack }) {
     handleSubmit,
     formState: { errors },
     watch,
-    setValue
+    setValue,
+    trigger
   } = useForm({
     resolver: zodResolver(preferencesSchema),
     mode: 'onBlur',
     defaultValues: {
-      preferences: tripData.step3?.preferences || {
+      preferences: tripData.preferences || {
         avoidCrowds: false,
         ecoFriendly: false,
         wheelchairAccessible: false,
         familyFriendly: false,
         petFriendly: false
       },
-      hotelClass: tripData.step3?.hotelClass || 'no-preference',
-      flightClass: tripData.step3?.flightClass || 'economy',
-      customPreferences: tripData.step3?.customPreferences || ''
+      hotelClass: tripData.hotelClass || 'no-preference',
+      flightClass: tripData.flightClass || 'economy',
+      customPreferences: tripData.customPreferences || ''
     }
   });
 
@@ -48,7 +47,14 @@ function Step3Preferences({ tripData, updateTripData, onValid, onBack }) {
     setCharCount(customPreferences?.length || 0);
   }, [customPreferences]);
 
-  // Validar para habilitar botón (siempre válido porque todo es opcional)
+  // ✅ Limpiar error cuando el usuario corrija los campos
+  useEffect(() => {
+    if (error) {
+      setError('');
+    }
+  }, [preferences, hotelClass, flightClass, customPreferences]);
+
+  // Validar para habilitar botón
   useEffect(() => {
     onValid(true);
   }, [onValid]);
@@ -68,78 +74,82 @@ function Step3Preferences({ tripData, updateTripData, onValid, onBack }) {
     }
   };
 
-  // ✅ Función robusta para obtener el origen desde EL LUGAR CORRECTO (step1, no step2)
+  // ✅ Función robusta para obtener el origen desde datos aplanados
   const getOrigin = () => {
-    console.log('🔍 [Step3] getOrigin() debugging:', {
-      step1_origin: tripData.step1?.origin,
-      step2_origin: tripData.step2?.origin,
-      sessionStorage_origin: sessionStorage.getItem('tripOrigin'),
-      tripData_keys: tripData ? Object.keys(tripData) : []
-    });
-    
-    // 1. ✅ Intentar desde tripData.step1 (DONDE REALMENTE SE GUARDA desde Step 1)
-    if (tripData.step1?.origin && typeof tripData.step1.origin === 'string' && tripData.step1.origin.trim()) {
-      console.log('✅ [Step3] Using origin from tripData.step1:', tripData.step1.origin);
-      return tripData.step1.origin;
+    // ✅ Usar datos aplanados desde la raíz de tripData
+    if (tripData?.origin && typeof tripData.origin === 'string' && tripData.origin.trim()) {
+      return tripData.origin;
     }
     
-    // 2. Intentar desde tripData.step2 (backup por si se propagó)
-    if (tripData.step2?.origin && typeof tripData.step2.origin === 'string' && tripData.step2.origin.trim()) {
-      console.log('✅ [Step3] Using origin from tripData.step2:', tripData.step2.origin);
-      return tripData.step2.origin;
-    }
-    
-    // 3. Intentar desde sessionStorage (backup guardado en Step 1)
+    // Fallback a sessionStorage
     const stored = sessionStorage.getItem('tripOrigin');
     if (stored && typeof stored === 'string' && stored.trim()) {
-      console.log('✅ [Step3] Using origin from sessionStorage:', stored);
       return stored;
     }
     
-    // 4. Fallback con logging explícito
-    console.warn('⚠️ [Step3] Using FALLBACK origin (no valid origin found):', {
-      fallback: 'New York, USA',
-      reason: 'step1.origin missing/empty AND step2.origin missing/empty AND sessionStorage.tripOrigin missing/empty'
-    });
     return 'New York, USA';
+  };
+
+  // ✅ NUEVO: Función robusta para obtener sessionId
+  const getSessionId = () => {
+    return tripData?.sessionId || sessionStorage.getItem('sessionId');
   };
 
   // ✅ Submit del paso 3 - GENERAR ITINERARIO CON IA
   const onSubmit = async (data) => {
     console.log('=== 🚀 GENERATING ITINERARY ===');
-    console.log('Form ', data);
-    console.log('Trip ', tripData);
+
+    // ✅ RF-07.01.02: Validar TODOS los campos al intentar enviar
+    const isValid = await trigger();
+    if (!isValid) {
+      console.log('❌ Validation failed, showing all errors');
+      return;
+    }
 
     setIsLoading(true);
     setError('');
 
     try {
       const token = sessionStorage.getItem('token');
-      const sessionId = sessionStorage.getItem('sessionId');
+      const sessionId = getSessionId();
       
-      // ✅ Extraer datos de cada paso con fallback seguro
-      const step1 = tripData.step1 || {};
-      const step2 = tripData.step2 || {};
-      const step3 = tripData.step3 || {};
-
-      // ✅ Obtener origen con función robusta (busca en step1 primero)
+      // ✅ EXTRAER DATOS CON ESTRUCTURA APLANADA (CORREGIDO)
+      // Los datos están en la raíz de tripData, NO en tripData.step1, etc.
+      const step1 = {
+        destination: tripData.destination || '',
+        startDate: tripData.startDate || '',
+        endDate: tripData.endDate || '',
+        duration: tripData.duration || 0
+      };
+      
+      const step2 = {
+        travelers: tripData.travelers || [],
+        budget: tripData.budget || 3000,
+        currency: tripData.currency || 'USD'
+      };
+      
+      const step3 = {
+        preferences: tripData.preferences || {},
+        hotelClass: tripData.hotelClass || 'no-preference',
+        flightClass: tripData.flightClass || 'economy',
+        customPreferences: tripData.customPreferences || ''
+      };
+      
       const origin = getOrigin();
-      
-      // ✅ DEBUG: Log completo del estado antes de enviar
-      console.log('🔍 [Step3] Final payload preparation:', {
-        origin_used: origin,
-        destination: step1.destination,
-        sessionId: sessionId,
-        token_present: !!token,
-        step1_has_origin: !!step1.origin,
-        step2_has_origin: !!step2.origin,
-        sessionStorage_has_tripOrigin: !!sessionStorage.getItem('tripOrigin')
+
+      // ✅ Logging para debuggear estructura de datos
+      console.log('🔍 [Step3] Data extraction for payload:', {
+        step1,
+        step2,
+        step3,
+        origin,
+        tripDataKeys: Object.keys(tripData || {})
       });
 
       // ✅ Construir payload para /api/extraction
       const payload = {
         tripData: {
-          origin: origin,  // ✅ Usar origen validado desde step1
+          origin: origin,
           destination: step1.destination,
           startDate: step1.startDate,
           endDate: step1.endDate,
@@ -164,19 +174,18 @@ function Step3Preferences({ tripData, updateTripData, onValid, onBack }) {
           petFriendly: data.preferences?.petFriendly || false,
           customNotes: data.customPreferences || step3.customPreferences || ''
         },
-        
-        // ✅ Incluir sessionId para cualquier recovery backend
         sessionId: sessionId || null
       };
 
       console.log('📤 Calling /api/extraction with payload:', {
-        tripData_origin: payload.tripData.origin,
-        tripData_destination: payload.tripData.destination,
-        has_sessionId: !!payload.sessionId
+        origin: payload.tripData.origin,
+        destination: payload.tripData.destination,
+        budget: payload.budget.total,
+        hotelClass: payload.preferences.hotelClass
       });
 
-      // ✅ Llamar al endpoint de extracción + Gemini con URL ABSOLUTA
-      const response = await fetch(`${API_BASE_URL}/api/extraction`, {
+      // ✅ Llamar al endpoint de extracción + Gemini
+      const response = await fetch(`${API_BASE_URL}/extraction`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -187,9 +196,20 @@ function Step3Preferences({ tripData, updateTripData, onValid, onBack }) {
 
       console.log('📥 Response status:', response.status, response.statusText);
 
+      // ✅ MANEJO DE ERRORES DEL BACKEND
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         console.error('❌ Backend error response:', errorData);
+        
+        // ✅ Si es error BUDGET_EXCEEDED, lanzar error con datos completos
+        if (errorData.error === 'BUDGET_EXCEEDED') {
+          throw new Error(JSON.stringify({
+            ...errorData,
+            message: errorData.message || 'Budget exceeded',
+            type: 'BUDGET_EXCEEDED'
+          }));
+        }
+        
         throw new Error(errorData.message || `Error ${response.status}: Failed to generate itinerary`);
       }
 
@@ -200,9 +220,42 @@ function Step3Preferences({ tripData, updateTripData, onValid, onBack }) {
         throw new Error(result.message || 'Failed to generate itinerary');
       }
 
+      // ✅ Guardar tripId en sessionStorage
+      const tripId = result.data?.itinerary?.tripId || result.data?.tripId;
+      if (tripId) {
+        sessionStorage.setItem('savedTripId', tripId);
+        console.log('✅ [Step3] savedTripId stored:', tripId);
+      }
+
       // ✅ Guardar en sessionStorage para la vista del itinerario
       sessionStorage.setItem('itineraryData', JSON.stringify(result.data));
       console.log('✅ Itinerary data saved to sessionStorage');
+
+      // ✅ NUEVO: Guardar payload original para posible regeneración futura
+      // ⚠️ CRÍTICO: Validar que tripData tenga los campos requeridos antes de guardar
+      const originalPayload = {
+        tripData: payload.tripData,
+        travelers: payload.travelers,
+        budget: payload.budget,
+        preferences: payload.preferences
+      };
+      
+      // ✅ Logging para verificar estructura antes de guardar
+      console.log('✅ [Step3] Saving originalGenerationPayload:', {
+        hasTripData: !!originalPayload.tripData,
+        tripData: originalPayload.tripData,
+        hasTravelers: !!originalPayload.travelers,
+        hasBudget: !!originalPayload.budget,
+        hasPreferences: !!originalPayload.preferences
+      });
+      
+      // ✅ Validar que tripData tenga campos requeridos antes de guardar
+      if (originalPayload.tripData?.destination && originalPayload.tripData?.startDate && originalPayload.tripData?.endDate) {
+        sessionStorage.setItem('originalGenerationPayload', JSON.stringify(originalPayload));
+        console.log('✅ [Step3] originalGenerationPayload stored for regeneration');
+      } else {
+        console.warn('⚠️ [Step3] originalGenerationPayload NOT stored - missing required fields in tripData');
+      }
 
       // ✅ Navegar a la vista del itinerario
       navigate('/itinerary');
@@ -210,8 +263,55 @@ function Step3Preferences({ tripData, updateTripData, onValid, onBack }) {
     } catch (err) {
       console.error('❌ ERROR generating itinerary:', err);
       
+      // ✅ Manejar error BUDGET_EXCEEDED específicamente
+      const isBudgetError = 
+        err.message?.includes('BUDGET_EXCEEDED') || 
+        err.message?.includes('Sorry, I cannot create an itinerary with this budget') ||
+        err.message?.includes('"type":"BUDGET_EXCEEDED"');
+      
+      if (isBudgetError) {
+        console.log('🚨 [Step3] Budget exceeded error detected, navigating to /budget-error');
+        
+        let errorData = {};
+        try {
+          if (typeof err.message === 'string' && err.message.startsWith('{')) {
+            errorData = JSON.parse(err.message);
+          } else if (typeof err.message === 'object') {
+            errorData = err.message;
+          }
+        } catch (e) {
+          console.warn('⚠️ Could not parse error data:', e);
+        }
+        
+        const step2 = {
+          budget: tripData.budget || 3000,
+          currency: tripData.currency || 'USD'
+        };
+        
+        navigate('/budget-error', {
+          state: {
+            budget: errorData.userBudget || step2.budget || tripData.budget || 500,
+            totalCost: errorData.estimatedTotal || 0,
+            currency: errorData.currency || step2.currency || tripData.currency || 'USD',
+            difference: errorData.difference || 0,
+            missingComponent: errorData.missingComponent || null,
+            breakdown: errorData.breakdown || null
+          }
+        });
+        
+        setIsLoading(false);
+        return;
+      }
+      
+      // ✅ RF-08.04: Mensajes de error específicos
       if (err.name === 'TypeError' && err.message.includes('fetch')) {
         setError('Unable to connect to server. Please check your connection.');
+      } else if (err.message?.includes('Destination not found')) {
+        setError('Destination not found, please verify the name');
+      } else if (err.message?.includes('Invalid date') || err.message?.includes('Dates')) {
+        setError('Invalid dates. Please check your travel dates.');
+      } else if (err.message?.includes('budget') || err.message?.includes('Budget')) {
+        setError('Budget insufficient. Please increase your budget and try again.');
       } else if (err.message) {
         setError(err.message);
       } else {

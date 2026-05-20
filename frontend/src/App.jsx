@@ -11,6 +11,7 @@ import TripBuilder from './pages/TripBuilder';  // ✅ Nuevo import para Trip Bu
 import authService from './services/auth.service';
 import Itinerary from './pages/Itinerary';
 import SavedItinerary from './pages/SavedItinerary';
+import BudgetErrorPage from './pages/BudgetErrorPage'; 
 
 // ✅ Componente para rutas protegidas con mensaje de expiración (RF-06.03)
 function ProtectedRoute({ children }) {
@@ -177,6 +178,8 @@ function App() {
 			  <SavedItinerary />
 		  } 
 		/>
+		
+		<Route path="/budget-error" element={<BudgetErrorPage />} /> 
 
         
         {/* Redirigir raíz */}

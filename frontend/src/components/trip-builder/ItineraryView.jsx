@@ -1,8 +1,9 @@
-// frontend/src/components/trip-builder/ItineraryView.jsx
-
-import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import logo from '../../assets/logo.png';
+
+// ✅ URL del backend para desarrollo (ajustar según tu configuración)
+const API_BASE_URL = import.meta?.env?.VITE_AWS_BACKEND_URL || 'http://100.48.137.197:3000/api';
 
 function ItineraryView({ 
   itineraryData, 
@@ -11,11 +12,21 @@ function ItineraryView({
   isSaving, 
   isExporting, 
   saveStatus,
-  actionType = 'save'  // ✅ NUEVO: 'save' | 'delete', default 'save'
+  actionType = 'save',  // ✅ NUEVO: 'save' | 'delete', default 'save'
+  allowRegeneration = true  // ✅ NUEVO: Controla visibilidad del botón Regenerate (default: true)
 }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [activeDay, setActiveDay] = useState(0);
   const [showInsights, setShowInsights] = useState(false);
+  
+  // ✅ NUEVO: Estados para regenerar itinerario con comentarios
+  const [showRegenerateModal, setShowRegenerateModal] = useState(false);
+  const [regenerateComments, setRegenerateComments] = useState('');
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  
+  // ✅ NUEVO: Estado para el tripId real (formato trip_xxx)
+  const [realTripId, setRealTripId] = useState(null);
 
   // ✅ CORREGIDO: Extraer estructura correcta
   // itineraryData ya es { extraction, itinerary } gracias a Itinerary.jsx
@@ -102,6 +113,257 @@ function ItineraryView({
     return 'bg-gray-100 text-gray-800';
   };
 
+  // ✅ NUEVO: Función para extraer tripId de la URL (/itinerary/trip_xxx)
+  const getTripIdFromUrl = () => {
+    const match = location.pathname.match(/\/itinerary\/(trip_[a-f0-9\-]+)/i);
+    return match ? match[1] : null;
+  };
+
+  // ✅ NUEVO: Función simple para obtener tripId REAL (solo formato trip_xxx)
+  const getRealTripId = () => {
+    // 1. Buscar en estado local (actualizado después de guardar)
+    if (realTripId && realTripId.startsWith('trip_')) {
+      return realTripId;
+    }
+    
+    // 2. Buscar en la URL actual (/itinerary/trip_xxx)
+    const urlTripId = getTripIdFromUrl();
+    if (urlTripId) {
+      return urlTripId;
+    }
+    
+    // 3. Buscar en itineraryData props (nivel principal)
+    if (itineraryData?.tripId && itineraryData.tripId.startsWith('trip_')) {
+      return itineraryData.tripId;
+    }
+    
+    // 4. Buscar en estructuras anidadas de itineraryData
+    if (itineraryData?.itinerary?.tripId && itineraryData.itinerary.tripId.startsWith('trip_')) {
+      return itineraryData.itinerary.tripId;
+    }
+    if (itineraryData?.extraction?.tripId && itineraryData.extraction.tripId.startsWith('trip_')) {
+      return itineraryData.extraction.tripId;
+    }
+    
+    // 5. Fallback: buscar en sessionStorage.itineraryData
+    try {
+      const stored = sessionStorage.getItem('itineraryData');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed?.tripId?.startsWith('trip_')) return parsed.tripId;
+        if (parsed?.itinerary?.tripId?.startsWith('trip_')) return parsed.itinerary.tripId;
+      }
+    } catch (e) {
+      // Ignorar errores de parseo
+    }
+    
+    // 6. Fallback manual: savedTripId
+    const savedId = sessionStorage.getItem('savedTripId');
+    if (savedId && savedId.startsWith('trip_')) {
+      return savedId;
+    }
+    
+    return null;
+  };
+
+  // ✅ NUEVO: Efecto para actualizar realTripId cuando cambian los datos
+  useEffect(() => {
+    const foundId = getRealTripId();
+    if (foundId && foundId !== realTripId) {
+      console.log('🔄 [ItineraryView] Updated realTripId:', foundId);
+      setRealTripId(foundId);
+    }
+  }, [itineraryData, location.pathname, saveStatus]);
+
+  // ✅ NUEVO: Efecto para actualizar realTripId cuando saveStatus cambia a 'success'
+  useEffect(() => {
+    if (saveStatus === 'success') {
+      const foundId = getRealTripId();
+      if (foundId && foundId !== realTripId) {
+        console.log('✅ [ItineraryView] Trip saved, updated realTripId:', foundId);
+        setRealTripId(foundId);
+      }
+    }
+  }, [saveStatus]);
+
+  // ✅ NUEVO: Verificar si se puede regenerar este itinerario
+  const canRegenerate = () => {
+    const tripId = getRealTripId();
+    return !!tripId;
+  };
+
+  // ✅ NUEVO: Función para regenerar itinerario con comentarios - LLAMANDO A /api/extraction CON FLAGS
+  const handleRegenerateItinerary = async () => {
+    const tripId = getRealTripId();
+    
+    // ✅ VALIDACIÓN: Si no hay tripId, intentar obtener originalPayload de sessionStorage
+    let originalRequest = null;
+    try {
+      const stored = sessionStorage.getItem('originalGenerationPayload');
+      if (stored) {
+        originalRequest = JSON.parse(stored);
+        
+        // ✅ LOG DETALLADO de la estructura recuperada
+        console.log('🔄 [Regenerate] originalRequest from sessionStorage:', {
+          hasTripData: !!originalRequest?.tripData,
+          tripData: originalRequest?.tripData,
+          hasTravelers: !!originalRequest?.travelers,
+          hasBudget: !!originalRequest?.budget,
+          hasPreferences: !!originalRequest?.preferences
+        });
+        
+        // ✅ VALIDAR que tripData tenga los campos requeridos
+        if (!originalRequest?.tripData?.destination || !originalRequest?.tripData?.startDate || !originalRequest?.tripData?.endDate) {
+          console.warn('⚠️ [Regenerate] originalRequest.tripData is incomplete, falling back to DynamoDB');
+          originalRequest = null;  // ← Forzar fallback a DynamoDB si los datos están corruptos
+        }
+      }
+    } catch (e) {
+      console.warn('⚠️ Could not parse originalGenerationPayload:', e);
+    }
+    
+    // ✅ Si no hay tripId Y no hay originalRequest válido, no se puede regenerar
+    if (!tripId && !originalRequest) {
+      alert('This itinerary has not been saved yet. Please save it to "My Trips" first, then you can regenerate it with your feedback.');
+      return;
+    }
+
+    if (!regenerateComments.trim()) {
+      alert('Please enter your feedback before regenerating');
+      return;
+    }
+
+    console.log('🔍 [Regenerate] Using:', { 
+      tripId, 
+      hasOriginalRequest: !!originalRequest,
+      originalRequestTripData: originalRequest?.tripData
+    });
+
+    setIsRegenerating(true);
+    
+    try {
+      const token = sessionStorage.getItem('token');
+      
+      // ✅ NUEVO: Construir requestBody para endpoint /api/extraction con flags de regeneración
+      const requestBody = {
+        // ✅ Datos del trip (de originalRequest o fallback a datos actuales)
+        tripData: originalRequest?.tripData || {
+          destination: summary?.destination,
+          startDate: summary?.travelDates?.start,
+          endDate: summary?.travelDates?.end,
+          duration: summary?.duration,
+          origin: extraction?.summary?.origin
+        },
+        travelers: originalRequest?.travelers || [],
+        budget: originalRequest?.budget || {
+          total: summary?.totalBudget,
+          currency: summary?.currency
+        },
+        preferences: originalRequest?.preferences || {},
+        
+        // ✅ Flags de regeneración (backend validará límite y procesará userComments)
+        isRegeneration: true,  // ✅ Backend sabrá que es regeneración
+        originalTripId: tripId || null,  // ✅ Para tracking del contador en DynamoDB
+        userComments: regenerateComments.trim(),  // ✅ Comentarios para ajustar itinerario
+        
+        // ✅ sessionId no es necesario para regeneración (usamos originalRequest)
+        sessionId: null
+      };
+      
+      // ✅ LOG COMPLETO del requestBody antes de enviar
+      console.log('📤 [Regenerate] Sending request to /api/extraction:', {
+        isRegeneration: requestBody.isRegeneration,
+        originalTripId: requestBody.originalTripId,
+        hasUserComments: !!requestBody.userComments,
+        tripData: requestBody.tripData,
+        userComments: requestBody.userComments?.substring(0, 100)
+      });
+      
+      // ✅ Endpoint NORMAL /api/extraction (reutilizamos el que ya funciona)
+      const response = await fetch(`${API_BASE_URL}/api/extraction`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('❌ Backend error:', errorData);
+        
+        // ✅ RF-08.04: Mensajes específicos según tipo de fallo
+        if (errorData.message?.includes('Destination not found')) {
+          throw new Error('Destination not found, please verify the name');
+        } else if (errorData.message?.includes('Invalid date')) {
+          throw new Error('Invalid dates. Please check your travel dates.');
+        } else if (errorData.message?.includes('budget') || errorData.message?.includes('Budget')) {
+          throw new Error('Budget insufficient. Please increase your budget and try again.');
+        } else if (errorData.message?.includes('Regeneration limit')) {
+          throw new Error('Regeneration limit reached');
+        }
+        
+        throw new Error(errorData.message || `Error ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('✅ Regeneration response:', result);
+	  
+	  // ✅ En handleRegenerateItinerary, reemplazar el bloque de éxito con:
+
+      if (result.success) {
+        alert('Itinerary regenerated successfully!');
+        setShowRegenerateModal(false);
+        setRegenerateComments('');
+  
+  // ✅ Normalizar estructura para compatibilidad
+        const dataToSave = {
+          extraction: result.data.extraction || result.data,
+          itinerary: result.data.itinerary || result.data
+        };
+  
+  // ✅ Siempre guardar en sessionStorage (backup)
+        sessionStorage.setItem('itineraryData', JSON.stringify(dataToSave));
+  
+  // ✅ Siempre llamar callback para actualización directa (si existe)
+        if (typeof onItineraryUpdated === 'function') {
+          console.log('🔄 [Regenerate] Calling onItineraryUpdated callback');
+          const updated = onItineraryUpdated(dataToSave);
+          if (updated) {
+            console.log('✅ [Regenerate] Parent component updated via callback');
+          }
+        }
+  
+  // ✅ Siempre forzar recarga con query param para garantizar carga fresca
+  // Esto asegura que Itinerary.jsx detecte el cambio via location.search
+        setTimeout(() => {
+          window.location.href = '/itinerary?regenerated=' + Date.now();
+        }, 100);  // Delay mínimo para asegurar que sessionStorage/callback se ejecuten
+  
+    } else {
+      throw new Error(result.message || 'Failed to regenerate itinerary');
+    }
+            
+    } catch (err) {
+      console.error('❌ Regeneration error:', err);
+      // ✅ RF-08.04: Mensajes específicos en alert
+      if (err.message?.includes('Destination not found')) {
+        alert('Destination not found, please verify the name');
+      } else if (err.message?.includes('Invalid date')) {
+        alert('Invalid dates. Please check your travel dates.');
+      } else if (err.message?.includes('budget') || err.message?.includes('Budget')) {
+        alert('Budget insufficient. Please increase your budget and try again.');
+      } else if (err.message?.includes('Regeneration limit')) {
+        alert('Regeneration limit reached');
+      } else {
+        alert(err.message || 'Error regenerating itinerary. Please try again.');
+      }
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
       {/* Header */}
@@ -175,6 +437,49 @@ function ItineraryView({
                 )}
               </button>
               
+              {/* ✅ NUEVO: Botón Regenerar con Comentarios - CONDICIONADO POR allowRegeneration */}
+              {allowRegeneration && (canRegenerate() || sessionStorage.getItem('originalGenerationPayload')) ? (
+                <button
+                  onClick={() => setShowRegenerateModal(true)}
+                  disabled={isRegenerating}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
+                    isRegenerating
+                      ? 'bg-gray-400 cursor-not-allowed text-white'
+                      : 'bg-purple-600 hover:bg-purple-700 text-white'
+                  }`}
+                  title="Regenerate itinerary with your feedback"
+                >
+                  {isRegenerating ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Regenerating...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Regenerate
+                    </>
+                  )}
+                </button>
+              ) : allowRegeneration ? (
+                // ✅ Mostrar botón deshabilitado solo si allowRegeneration=true pero no hay datos para regenerar
+                <button
+                  disabled
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm bg-gray-300 text-gray-500 cursor-not-allowed"
+                  title="Save this trip first to enable regeneration"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Regenerate
+                </button>
+              ) : null}  {/* ✅ Si allowRegeneration=false, no renderizar nada */}
+              
               {/* Botón Exportar PDF */}
               <button
                 onClick={onExportPDF}
@@ -238,7 +543,6 @@ function ItineraryView({
                 }
               </p>
             </div>
-            {/* ✅ Mostrar presupuesto total y restante claramente */}
             <div className="text-right">
               <p className="text-xs text-gray-500">Total Budget</p>
               <p className="text-lg font-bold text-quester-dark">{formatCurrency(totalBudget, summary?.currency)}</p>
@@ -300,7 +604,7 @@ function ItineraryView({
           </div>
         </div>
 
-        {/* Flight Details - ✅ USANDO selectedFlights REALES */}
+        {/* Flight Details */}
         {selectedFlights?.outbound && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
             <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
@@ -410,7 +714,7 @@ function ItineraryView({
           </div>
         )}
 
-        {/* Hotel Details - ✅ USANDO selectedHotel REAL */}
+        {/* Hotel Details */}
         {selectedHotel && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
             <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
@@ -468,7 +772,7 @@ function ItineraryView({
           </div>
         )}
 
-        {/* Weather Considerations - ✅ USANDO recommendations.weatherConsiderations */}
+        {/* Weather Considerations */}
         {recommendations?.weatherConsiderations && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
             <div className="flex items-start gap-3">
@@ -483,7 +787,7 @@ function ItineraryView({
           </div>
         )}
 
-        {/* ✅ NUEVO: Transport Guidance - USANDO recommendations.transportGuidance */}
+        {/* Transport Guidance */}
         {recommendations?.transportGuidance && (
           <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-6">
             <div className="flex items-start gap-3">
@@ -548,7 +852,7 @@ function ItineraryView({
                         </span>
                       )}
                       
-                      {/* ✅ NUEVO: Mostrar transporte con icono y badge */}
+                      {/* Transport info */}
                       {activity.transport?.recommendedMethod && (
                         <span className="flex items-center gap-1">
                           <span className="text-lg">{getTransportIcon(activity.transport.recommendedMethod)}</span>
@@ -574,7 +878,7 @@ function ItineraryView({
                       )}
                     </div>
 
-                    {/* ✅ NUEVO: Mostrar descripción de transporte si está disponible */}
+                    {/* Transport description */}
                     {activity.transport?.recommendedMethod && activity.transport.recommendedMethod !== 'walking' && (
                       <p className="text-xs text-gray-500 mt-1 ml-1">
                         💡 {activity.transport.recommendedMethod} recommended: {activity.transport.recommendedMethod.toLowerCase().includes('metro') ? 'Fastest and most economical option' : activity.transport.recommendedMethod.toLowerCase().includes('taxi') ? 'Most convenient for short distances' : 'Good balance of cost and convenience'}
@@ -638,8 +942,7 @@ function ItineraryView({
               </div>
             )}
 
-            {/* ✅ NUEVO: Transport Guidance en recomendaciones si no se mostró arriba */}
-            {!recommendations?.transportGuidance && recommendations?.transportGuidance && (
+            {recommendations?.transportGuidance && (
               <div>
                 <h4 className="font-semibold text-gray-700 mb-2">Transport Guidance</h4>
                 <p className="text-sm text-gray-600">{recommendations.transportGuidance}</p>
@@ -648,6 +951,87 @@ function ItineraryView({
           </div>
         )}
       </main>
+
+      {/* ✅ NUEVO: MODAL - Regenerar con Comentarios */}
+      {showRegenerateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-quester-dark">Regenerate Itinerary</h3>
+              <button
+                onClick={() => {
+                  setShowRegenerateModal(false);
+                  setRegenerateComments('');
+                }}
+                className="p-2 text-gray-500 hover:text-gray-700"
+                disabled={isRegenerating}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <p className="text-sm text-gray-600 mb-4">
+              Tell us what you'd like to change. Examples:
+            </p>
+            <ul className="text-xs text-gray-500 mb-4 space-y-1 list-disc list-inside">
+              <li>"I don't want to visit the museum"</li>
+              <li>"The hotel doesn't suit my style"</li>
+              <li>"I want fewer activities per day"</li>
+              <li>"Add more food experiences"</li>
+            </ul>
+            
+            <textarea
+              value={regenerateComments}
+              onChange={(e) => setRegenerateComments(e.target.value)}
+              placeholder="Enter your feedback here..."
+              className="w-full h-32 px-4 py-3 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-quester-blue resize-none"
+              style={{ backgroundColor: 'rgba(211, 225, 255, 0.15)' }}
+              disabled={isRegenerating}
+            />
+            
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowRegenerateModal(false);
+                  setRegenerateComments('');
+                }}
+                disabled={isRegenerating}
+                className="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleRegenerateItinerary}
+                disabled={isRegenerating || !regenerateComments.trim()}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-white transition-colors ${
+                  isRegenerating || !regenerateComments.trim()
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-purple-600 hover:bg-purple-700'
+                }`}
+              >
+                {isRegenerating ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Regenerate Itinerary
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Regenerate Itinerary
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

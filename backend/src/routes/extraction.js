@@ -15,4 +15,7 @@ router.post('/', extractionController.extractAndGenerate);
 // ✅ Endpoint solo para extracción (sin Gemini) - útil para debugging
 router.post('/data-only', extractionController.extractDataOnly);
 
+router.post('/regenerate', extractionController.regenerateWithFeedback);
+console.log('✅ Route registered: POST /regenerate');
+
 module.exports = router;
